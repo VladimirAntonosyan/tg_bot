@@ -33,35 +33,6 @@ const TEAMS_FILE = path.join(__dirname, 'teams.json');
 // Загрузка списка команд
 function loadTeams() {
     try {
-        if (!fs.existsSync(TEAMS_FILE)) {
-            // Если файла нет, создаем с дефолтным списком
-            const defaultTeams = [
-                "Real Madrid",
-                "Manchester City",
-                "FC Bayern München",
-                "Arsenal",
-                "Liverpool",
-                "Bayer 04 Leverkusen",
-                "FC Barcelona",
-                "Paris Saint-Germain",
-                "Atlético de Madrid",
-                "Inter Milan",
-                "Manchester United",
-                "Tottenham Hotspur",
-                "Borussia Dortmund",
-                "Napoli",
-                "Juventus",
-                "Newcastle United",
-                "Milano FC (AC Milan)",
-                "Chelsea",
-                "RB Leipzig",
-                "Latium",
-                "Aston Villa",
-                "Roma (AS Roma)"
-            ];
-            saveTeams(defaultTeams);
-            return defaultTeams;
-        }
         const data = fs.readFileSync(TEAMS_FILE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
