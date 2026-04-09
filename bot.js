@@ -190,15 +190,14 @@ function getStandingsTable(stats) {
         const diff = s.goalsFor - s.goalsAgainst;
         const diffText = diff >= 0 ? `+${diff}` : `${diff}`;
         table += `${medal}${s.name} (${s.team})\n`;
-        table += `   ${s.matchesPlayed} игр · ${s.points} очков · голы ${s.goalsFor}:${s.goalsAgainst} (${diffText})\n`;
-        table += `   Побед: ${s.wins} | Пен: ${s.penaltyWins} | Пораж: ${s.losses}\n\n`;
+        table += `   ${s.matchesPlayed} игр · ${s.points} очков · голы ${s.goalsFor}:${s.goalsAgainst} (${diffText})\n\n`;
     });
     
     return table;
 }
 
 // Получение Live-статуса
-function getLiveStatus(matches, stats) {
+function getLiveStatus(matches) {
     const completed = matches.filter(m => m.completed).length;
     const total = matches.length;
     const remaining = matches.filter(m => !m.completed);
@@ -218,7 +217,7 @@ function getLiveStatus(matches, stats) {
     return status;
 }
 
-// Главное меню
+// Главное меню (убрана кнопка Жеребьевка)
 function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     if (isTournamentActive) {
         const keyboard = [
@@ -230,8 +229,8 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     }
     
     const keyboard = [
-        [{ text: '🎲 Жеребьевка' }, { text: '📋 Список команд' }],
-        [{ text: '🏆 Новый турнир' }, { text: '❓ Помощь' }]
+        [{ text: '🏆 Новый турнир' }, { text: '📋 Список команд' }],
+        [{ text: '❓ Помощь' }]
     ];
     
     if (isAdminUser) {
@@ -249,7 +248,7 @@ function createTournamentSelectionKeyboard(userId, selectedIds = []) {
     for (const participant of KNOWN_PARTICIPANTS) {
         const isSelected = selectedIds.includes(participant.id);
         const buttonText = isSelected ? `✅ ${participant.name}` : `⬜️ ${participant.name}`;
-        const callbackData = `tournament_toggle_${participant.id}_${userId}`;
+        const callbackData = `tournament_toggle_${participant.id}`;
         
         row.push({ text: buttonText, callback_data: callbackData });
         
@@ -263,31 +262,31 @@ function createTournamentSelectionKeyboard(userId, selectedIds = []) {
         inlineKeyboard.push(row);
     }
     
-    inlineKeyboard.push([{ text: '🎲 Начать турнир', callback_data: `tournament_start_${userId}` }]);
-    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: `tournament_cancel_${userId}` }]);
+    inlineKeyboard.push([{ text: '🎲 Начать турнир', callback_data: 'tournament_start' }]);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'tournament_cancel' }]);
     
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
 // Клавиатура выбора матча для записи результата
-function createMatchSelectionKeyboard(userId, matches) {
+function createMatchSelectionKeyboard(matches) {
     const inlineKeyboard = [];
     const incompleteMatches = matches.filter(m => !m.completed);
     
     incompleteMatches.forEach(match => {
         inlineKeyboard.push([{ 
             text: `${match.player1} vs ${match.player2}`, 
-            callback_data: `record_match_${match.id}_${userId}` 
+            callback_data: `record_match_${match.id}` 
         }]);
     });
     
-    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: `cancel_record_${userId}` }]);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'cancel_record' }]);
     
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
 // Клавиатура выбора матча для редактирования
-function createEditMatchSelectionKeyboard(userId, matches) {
+function createEditMatchSelectionKeyboard(matches) {
     const inlineKeyboard = [];
     const completedMatches = matches.filter(m => m.completed);
     
@@ -299,11 +298,11 @@ function createEditMatchSelectionKeyboard(userId, matches) {
         const scoreText = `${match.player1} ${match.score1}:${match.score2} ${match.player2}`;
         inlineKeyboard.push([{ 
             text: scoreText, 
-            callback_data: `edit_match_${match.id}_${userId}` 
+            callback_data: `edit_match_${match.id}` 
         }]);
     });
     
-    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: `cancel_edit_${userId}` }]);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'cancel_edit' }]);
     
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
@@ -315,7 +314,7 @@ bot.onText(/\/start/, (msg) => {
     
     isAdmin(chatId, userId).then(isAdminUser => {
         bot.sendMessage(chatId, 
-            '🎯 *Добро пожаложаловать в Турнирного бота!*\n\nИспользуй кнопки ниже для управления.\n\nИзвестные участники: Владимир, Нуриман, Никита, Станислав',
+            '🎯 *Добро пожаловать в Турнирного бота!*\n\nИспользуй кнопки ниже для управления.\n\nИзвестные участники: Владимир, Нуриман, Никита, Станислав',
             { parse_mode: 'Markdown', ...getMainKeyboard(isAdminUser, !!currentTournament) }
         );
     });
@@ -330,16 +329,9 @@ bot.on('callback_query', async (callbackQuery) => {
     
     // Создание турнира - выбор участников
     if (data.startsWith('tournament_toggle_')) {
-        const parts = data.split('_');
-        const participantId = parts[2];
-        const requesterId = parseInt(parts[3]);
+        const participantId = data.replace('tournament_toggle_', '');
         
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только создатель турнира может выбирать участников!' });
-            return;
-        }
-        
-        const selectionKey = `tournament_${requesterId}`;
+        const selectionKey = `tournament_${chatId}`;
         let selected = selectedParticipants.get(selectionKey) || [];
         
         const participant = KNOWN_PARTICIPANTS.find(p => p.id === participantId);
@@ -370,18 +362,11 @@ bot.on('callback_query', async (callbackQuery) => {
         await bot.editMessageText(statusText, {
             chat_id: chatId,
             message_id: messageId,
-            ...createTournamentSelectionKeyboard(requesterId, selected)
+            ...createTournamentSelectionKeyboard(userId, selected)
         });
         
-    } else if (data.startsWith('tournament_start_')) {
-        const requesterId = parseInt(data.split('_')[2]);
-        
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только создатель может начать турнир!' });
-            return;
-        }
-        
-        const selectionKey = `tournament_${requesterId}`;
+    } else if (data === 'tournament_start') {
+        const selectionKey = `tournament_${chatId}`;
         const selected = selectedParticipants.get(selectionKey) || [];
         
         if (selected.length < 2) {
@@ -442,19 +427,12 @@ bot.on('callback_query', async (callbackQuery) => {
         
         selectedParticipants.delete(selectionKey);
         
-        const isAdminUser = await isAdmin(chatId, requesterId);
+        const isAdminUser = await isAdmin(chatId, userId);
         bot.sendMessage(chatId, '✅ Турнир создан! Используй кнопки для управления.', 
             getMainKeyboard(isAdminUser, true));
         
-    } else if (data.startsWith('tournament_cancel_')) {
-        const requesterId = parseInt(data.split('_')[2]);
-        
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только создатель может отменить!' });
-            return;
-        }
-        
-        const selectionKey = `tournament_${requesterId}`;
+    } else if (data === 'tournament_cancel') {
+        const selectionKey = `tournament_${chatId}`;
         selectedParticipants.delete(selectionKey);
         
         await bot.editMessageText('❌ Создание турнира отменено', {
@@ -462,18 +440,11 @@ bot.on('callback_query', async (callbackQuery) => {
             message_id: messageId
         });
         
-        const isAdminUser = await isAdmin(chatId, requesterId);
+        const isAdminUser = await isAdmin(chatId, userId);
         bot.sendMessage(chatId, 'Возврат в главное меню', getMainKeyboard(isAdminUser, false));
         
     } else if (data.startsWith('record_match_')) {
-        const parts = data.split('_');
-        const matchId = parseInt(parts[3]);
-        const requesterId = parseInt(parts[4]);
-        
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только инициатор может записывать результат!' });
-            return;
-        }
+        const matchId = parseInt(data.replace('record_match_', ''));
         
         if (!currentTournament || !currentTournament.active) {
             await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Нет активного турнира!' });
@@ -493,14 +464,7 @@ bot.on('callback_query', async (callbackQuery) => {
         });
         
     } else if (data.startsWith('edit_match_')) {
-        const parts = data.split('_');
-        const matchId = parseInt(parts[3]);
-        const requesterId = parseInt(parts[4]);
-        
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только инициатор может редактировать!' });
-            return;
-        }
+        const matchId = parseInt(data.replace('edit_match_', ''));
         
         if (!currentTournament || !currentTournament.active) {
             await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Нет активного турнира!' });
@@ -515,6 +479,13 @@ bot.on('callback_query', async (callbackQuery) => {
         
         userStates.set(userId, { action: 'editing_score', matchId: matchId });
         await bot.editMessageText(`✏️ Введи новый счет основного времени для матча:\n${match.player1} vs ${match.player2}\n\nТекущий счет: ${match.score1}:${match.score2}\n\nПример: 2:1 или 0:0`, {
+            chat_id: chatId,
+            message_id: messageId
+        });
+        
+    } else if (data === 'cancel_record' || data === 'cancel_edit') {
+        userStates.delete(userId);
+        await bot.editMessageText('❌ Операция отменена', {
             chat_id: chatId,
             message_id: messageId
         });
@@ -564,8 +535,8 @@ bot.on('message', async (msg) => {
             const keyboard = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: tournamentMatch.player1, callback_data: `penalty_${tournamentMatch.player1}_${userId}` }],
-                        [{ text: tournamentMatch.player2, callback_data: `penalty_${tournamentMatch.player2}_${userId}` }]
+                        [{ text: tournamentMatch.player1, callback_data: `penalty_${tournamentMatch.player1}` }],
+                        [{ text: tournamentMatch.player2, callback_data: `penalty_${tournamentMatch.player2}` }]
                     ]
                 }
             };
@@ -583,7 +554,7 @@ bot.on('message', async (msg) => {
             // Показываем обновленную таблицу
             const stats = calculateStats(currentTournament.participants, currentTournament.matches);
             const standings = getStandingsTable(stats);
-            const liveStatus = getLiveStatus(currentTournament.matches, stats);
+            const liveStatus = getLiveStatus(currentTournament.matches);
             
             bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
             bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
@@ -652,17 +623,6 @@ bot.on('message', async (msg) => {
     const isAdminUser = await isAdmin(chatId, userId);
     
     switch (text) {
-        case '🎲 Жеребьевка':
-            if (currentTournament) {
-                bot.sendMessage(chatId, '⚠️ Сначала заверши или прерви текущий турнир!');
-                break;
-            }
-            bot.sendMessage(chatId, 
-                `👥 Выбери участников для жеребьевки:\n\n(просто нажимай на имена, чтобы выбрать/отменить)\n\nМожно выбрать от 1 до 4 участников.`,
-                createTournamentSelectionKeyboard(userId, [])
-            );
-            break;
-            
         case '🏆 Новый турнир':
             if (currentTournament) {
                 bot.sendMessage(chatId, '⚠️ Активный турнир уже идет! Сначала заверши или прерви его.');
@@ -698,7 +658,7 @@ bot.on('message', async (msg) => {
                 break;
             }
             bot.sendMessage(chatId, '📝 Выбери матч для записи результата:', 
-                createMatchSelectionKeyboard(userId, currentTournament.matches));
+                createMatchSelectionKeyboard(currentTournament.matches));
             break;
             
         case '📊 Таблица':
@@ -721,7 +681,7 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, '❌ Нет завершенных матчей для редактирования!');
                 break;
             }
-            const editKeyboard = createEditMatchSelectionKeyboard(userId, currentTournament.matches);
+            const editKeyboard = createEditMatchSelectionKeyboard(currentTournament.matches);
             if (editKeyboard) {
                 bot.sendMessage(chatId, '✏️ Выбери матч для редактирования:', editKeyboard);
             }
@@ -760,10 +720,8 @@ bot.on('message', async (msg) => {
             currentTournament.matches.forEach(m => {
                 if (m.penalties) {
                     finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2} — пен. поб. ${m.penalties}\n`;
-                } else if (m.score1 > m.score2) {
-                    finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2} — осн.\n`;
                 } else {
-                    finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2} — осн.\n`;
+                    finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2}\n`;
                 }
             });
             
@@ -825,14 +783,12 @@ bot.on('message', async (msg) => {
 <b>🏆 Завершить</b> — подвести итоги и завершить турнир\n
 <b>⚠️ Прервать турнир</b> — отменить турнир без сохранения\n\n
 <b>Система очков:</b>\n
-• Победа в основное время — 2:0\n
-• Победа по пенальти — 2:1\n
-• Ничья — 1:1\n
-• Поражение — 0 очков` :
+• Победа в основное время — 2 очка\n
+• Победа по пенальти — 2 очка победителю, 1 очко проигравшему\n
+• Ничья — 1 очко каждому` :
                 `<b>🎯 Турнирный бот</b>\n\n
 <b>Основные команды:</b>\n
-• 🎲 Жеребьевка — распределить команды между участниками\n
-• 🏆 Новый турнир — создать турнир "каждый с каждым"\n
+• 🏆 Новый турнир — создать турнир "каждый с каждым" с автоматической жеребьевкой команд\n
 • 📋 Список команд — показать все доступные команды\n\n
 <b>Для админов чата:</b>\n
 • ➕ Добавить команду\n
@@ -840,7 +796,7 @@ bot.on('message', async (msg) => {
 <b>В турнире:</b>\n
 • Каждый играет с каждым 1 раз\n
 • За победу — 2 очка, за ничью — 1\n
-• При ничьей — серия пенальти (победитель получает 2, проигравший 1)`;
+• При ничьей в основное время — серия пенальти (победитель получает 2, проигравший 1)`;
             
             bot.sendMessage(chatId, helpMessage, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
             break;
@@ -865,14 +821,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     
     if (data.startsWith('penalty_')) {
-        const parts = data.split('_');
-        const winner = parts[1];
-        const requesterId = parseInt(parts[2]);
-        
-        if (userId !== requesterId) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Только инициатор может выбрать победителя!' });
-            return;
-        }
+        const winner = data.replace('penalty_', '');
         
         const userState = userStates.get(userId);
         if (!userState || userState.action !== 'waiting_for_penalty') {
@@ -891,10 +840,7 @@ bot.on('callback_query', async (callbackQuery) => {
         match.penalties = winner;
         match.completed = true;
         
-        const winnerName = winner === match.player1 ? match.player1 : match.player2;
-        const loserName = winner === match.player1 ? match.player2 : match.player1;
-        
-        await bot.editMessageText(`✅ Результат записан!\n\n${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n⚽️ Ничья в основное время!\n🏆 Победа по пенальти: ${winnerName}`, {
+        await bot.editMessageText(`✅ Результат записан!\n\n${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n⚽️ Ничья в основное время!\n🏆 Победа по пенальти: ${winner}`, {
             chat_id: chatId,
             message_id: callbackQuery.message.message_id
         });
@@ -902,7 +848,7 @@ bot.on('callback_query', async (callbackQuery) => {
         // Показываем обновленную таблицу
         const stats = calculateStats(currentTournament.participants, currentTournament.matches);
         const standings = getStandingsTable(stats);
-        const liveStatus = getLiveStatus(currentTournament.matches, stats);
+        const liveStatus = getLiveStatus(currentTournament.matches);
         
         bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
         bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
@@ -919,45 +865,7 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 });
 
-// Обработка команды /draw через текстовый ввод
-bot.onText(/\/draw(@\w+)?(\s+@\w+)*/, async (msg) => {
-    const chatId = msg.chat.id;
-    const messageText = msg.text;
-    
-    const mentionRegex = /@(\w+)/g;
-    const mentions = [];
-    let mentionMatch;
-    
-    while ((mentionMatch = mentionRegex.exec(messageText)) !== null) {
-        mentions.push(mentionMatch[1]);
-    }
-    
-    if (mentions.length === 0) {
-        bot.sendMessage(chatId, '❌ Укажи участников после команды. Пример: /draw @vladimir @nuriman');
-        return;
-    }
-    
-    const teams = loadTeams();
-    if (teams.length < mentions.length) {
-        bot.sendMessage(chatId, `❌ Недостаточно команд! Нужно: ${mentions.length}, доступно: ${teams.length}. Добавь команды через /add_team`);
-        return;
-    }
-    
-    const shuffledTeams = shuffleArray(teams);
-    const assignments = mentions.map((username, index) => ({
-        username,
-        team: shuffledTeams[index % shuffledTeams.length]
-    }));
-    
-    let resultMessage = '<b>🎲 Результаты жеребьевки:</b>\n\n';
-    assignments.forEach(assignment => {
-        resultMessage += `👤 @${assignment.username}\n⚽️ <b>${assignment.team}</b>\n\n`;
-    });
-    
-    bot.sendMessage(chatId, resultMessage, { parse_mode: 'HTML' });
-});
-
-// Команда /list_teams
+// Обработка команды /list_teams для обратной совместимости
 bot.onText(/\/list_teams/, async (msg) => {
     const chatId = msg.chat.id;
     const teams = loadTeams();
