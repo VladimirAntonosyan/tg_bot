@@ -805,11 +805,10 @@ bot.on('message', async (msg) => {
             userStates.delete(userId);
             bot.sendMessage(chatId, '⬅️ Возврат в главное меню', getMainKeyboard(isAdminUser, !!currentTournament));
             break;
-            
+
         default:
-            if (!text.startsWith('/')) {
-                // Игнорируем обычные сообщения
-            }
+
+            if (text && !text.startsWith('/')) {}
             break;
     }
 });
