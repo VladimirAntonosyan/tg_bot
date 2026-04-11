@@ -504,11 +504,12 @@ bot.on('message', async (msg) => {
     
     // Обработка ввода счета для матча
     if (userState && (userState.action === 'waiting_for_score' || userState.action === 'editing_score')) {
-        const scoreRegex = /^(\d+):(\d+)$/;
+        // Поддерживаем форматы: "3:1" или "3 1" или "3-1"
+        const scoreRegex = /^(\d+)[:\s\-](\d+)$/;
         const match = scoreRegex.exec(text);
         
         if (!match) {
-            bot.sendMessage(chatId, '❌ Неверный формат! Введи счет как ЧИСЛО:ЧИСЛО, например 2:1 или 0:0');
+            bot.sendMessage(chatId, '❌ Неверный формат! Введи счет как ЧИСЛО:ЧИСЛО, ЧИСЛО ЧИСЛО или ЧИСЛО-ЧИСЛО\n\nПримеры: 2:1, 2 1, 2-1');
             return;
         }
         
