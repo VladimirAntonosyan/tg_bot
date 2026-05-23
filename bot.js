@@ -42,7 +42,8 @@ const KNOWN_PARTICIPANTS = [
     { id: 'vladimir', name: 'Владимир', username: 'antsn21' },
     { id: 'nuriman', name: 'Нуриман', username: 'bnm11' },
     { id: 'nikita', name: 'Никита', username: 'NadezhinN' },
-    { id: 'stanislav', name: 'Станислав', username: 'stas_0297' }
+    { id: 'stanislav', name: 'Станислав', username: 'stas_0297' },
+    { id: 'denis', name: 'Денис', username: 'DenisMosman' }
 ];
 
 // Загрузка списка команд
@@ -314,7 +315,7 @@ bot.onText(/\/start/, (msg) => {
     
     isAdmin(chatId, userId).then(isAdminUser => {
         bot.sendMessage(chatId, 
-            '🎯 *Добро пожаловать в Турнирного бота!*\n\nИспользуй кнопки ниже для управления.\n\nИзвестные участники: Владимир, Нуриман, Никита, Станислав',
+            '🎯 *Добро пожаловать в Турнирного бота!*\n\nИспользуй кнопки ниже для управления.\n\nИзвестные участники: Владимир, Нуриман, Никита, Станислав, Денис',
             { parse_mode: 'Markdown', ...getMainKeyboard(isAdminUser, !!currentTournament) }
         );
     });
