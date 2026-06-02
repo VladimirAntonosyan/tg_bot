@@ -37,6 +37,9 @@ const selectedParticipants = new Map();
 // Текущий активный турнир
 let currentTournament = null;
 
+// Хранилище ID сообщений турнира
+let tournamentMessages = [];
+
 // Список известных участников
 const KNOWN_PARTICIPANTS = [
     { id: 'vladimir', name: 'Владимир', username: 'antsn21' },
@@ -80,6 +83,23 @@ async function isAdmin(chatId, userId) {
     } catch (error) {
         return false;
     }
+}
+
+// Сохранение ID сообщения
+function saveMessageId(chatId, messageId) {
+    tournamentMessages.push({ chatId, messageId });
+}
+
+// Удаление всех сообщений турнира
+async function deleteTournamentMessages() {
+    for (const msg of tournamentMessages) {
+        try {
+            await bot.deleteMessage(msg.chatId, msg.messageId);
+        } catch (error) {
+            // Игнорируем ошибки (сообщение могло уже быть удалено)
+        }
+    }
+    tournamentMessages = [];
 }
 
 // Генерация расписания матчей (каждый с каждым)
@@ -218,7 +238,7 @@ function getLiveStatus(matches) {
     return status;
 }
 
-// Главное меню (убрана кнопка Жеребьевка)
+// Главное меню
 function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     if (isTournamentActive) {
         const keyboard = [
@@ -341,8 +361,8 @@ bot.on('callback_query', async (callbackQuery) => {
             selected = selected.filter(id => id !== participantId);
             await bot.answerCallbackQuery(callbackQuery.id, { text: `❌ Убран: ${participant.name}` });
         } else {
-            if (selected.length >= 4) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Максимум 4 участника в турнире!' });
+            if (selected.length >= 5) {
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Максимум 5 участников в турнире!' });
                 return;
             }
             selected.push(participantId);
@@ -358,13 +378,14 @@ bot.on('callback_query', async (callbackQuery) => {
         
         const statusText = selected.length > 0 
             ? `👥 Выбрано участников: ${selected.length}\n\n✅ ${selectedNames.join(', ')}\n\n━━━━━━━━━━━━━━━━━\nНажми "🎲 Начать турнир" для жеребьевки команд и создания расписания.` 
-            : `👥 Выбери участников турнира (от 2 до 4 человек):\n\n(просто нажимай на имена, чтобы выбрать/отменить)`;
+            : `👥 Выбери участников турнира (от 2 до 5 человек):\n\n(просто нажимай на имена, чтобы выбрать/отменить)`;
         
         await bot.editMessageText(statusText, {
             chat_id: chatId,
             message_id: messageId,
             ...createTournamentSelectionKeyboard(userId, selected)
         });
+        saveMessageId(chatId, messageId);
         
     } else if (data === 'tournament_start') {
         const selectionKey = `tournament_${chatId}`;
@@ -425,12 +446,14 @@ bot.on('callback_query', async (callbackQuery) => {
             message_id: messageId,
             parse_mode: 'HTML'
         });
+        saveMessageId(chatId, messageId);
         
         selectedParticipants.delete(selectionKey);
         
         const isAdminUser = await isAdmin(chatId, userId);
-        bot.sendMessage(chatId, '✅ Турнир создан! Используй кнопки для управления.', 
+        const confirmMsg = await bot.sendMessage(chatId, '✅ Турнир создан! Используй кнопки для управления.', 
             getMainKeyboard(isAdminUser, true));
+        saveMessageId(chatId, confirmMsg.message_id);
         
     } else if (data === 'tournament_cancel') {
         const selectionKey = `tournament_${chatId}`;
@@ -543,7 +566,8 @@ bot.on('message', async (msg) => {
                 }
             };
             
-            bot.sendMessage(chatId, `⚽️ Ничья ${score1}:${score2} в основное время!\n\nКто победил по пенальти?`, keyboard);
+            const penaltyMsg = await bot.sendMessage(chatId, `⚽️ Ничья ${score1}:${score2} в основное время!\n\nКто победил по пенальти?`, keyboard);
+            saveMessageId(chatId, penaltyMsg.message_id);
         } else {
             // Победа в основное время
             tournamentMatch.score1 = score1;
@@ -551,22 +575,26 @@ bot.on('message', async (msg) => {
             tournamentMatch.penalties = null;
             tournamentMatch.completed = true;
             
-            bot.sendMessage(chatId, `✅ Результат записан!\n\n${tournamentMatch.player1} ${score1}:${score2} ${tournamentMatch.player2}\n🏆 Победа в основное время`);
+            const resultMsg = await bot.sendMessage(chatId, `✅ Результат записан!\n\n${tournamentMatch.player1} ${score1}:${score2} ${tournamentMatch.player2}\n🏆 Победа в основное время`);
+            saveMessageId(chatId, resultMsg.message_id);
             
             // Показываем обновленную таблицу
             const stats = calculateStats(currentTournament.participants, currentTournament.matches);
             const standings = getStandingsTable(stats);
             const liveStatus = getLiveStatus(currentTournament.matches);
             
-            bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
-            bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
+            const standingsMsg = await bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
+            const statusMsg = await bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
+            saveMessageId(chatId, standingsMsg.message_id);
+            saveMessageId(chatId, statusMsg.message_id);
             
             userStates.delete(userId);
             
             // Проверяем, завершен ли турнир
             const allCompleted = currentTournament.matches.every(m => m.completed);
             if (allCompleted) {
-                bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить" для подведения итогов.');
+                const completeMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить" для подведения итогов.');
+                saveMessageId(chatId, completeMsg.message_id);
             }
         }
         return;
@@ -631,7 +659,7 @@ bot.on('message', async (msg) => {
                 break;
             }
             bot.sendMessage(chatId, 
-                `👥 Выбери участников турнира (от 2 до 4 человек):\n\n(просто нажимай на имена, чтобы выбрать/отменить)`,
+                `👥 Выбери участников турнира (от 2 до 5 человек):\n\n(просто нажимай на имена, чтобы выбрать/отменить)`,
                 createTournamentSelectionKeyboard(userId, [])
             );
             break;
@@ -701,6 +729,9 @@ bot.on('message', async (msg) => {
                 break;
             }
             
+            // Удаляем все сообщения турнира
+            await deleteTournamentMessages();
+            
             const finalStats = calculateStats(currentTournament.participants, currentTournament.matches);
             const sorted = [...finalStats].sort((a, b) => {
                 if (a.points !== b.points) return b.points - a.points;
@@ -727,10 +758,10 @@ bot.on('message', async (msg) => {
                 }
             });
             
-            bot.sendMessage(chatId, finalMessage, { parse_mode: 'HTML' });
+            await bot.sendMessage(chatId, finalMessage, { parse_mode: 'HTML' });
             
             currentTournament = null;
-            bot.sendMessage(chatId, '✅ Турнир завершен! Можешь начать новый.', getMainKeyboard(isAdminUser, false));
+            await bot.sendMessage(chatId, '✅ Турнир завершен! Можешь начать новый.', getMainKeyboard(isAdminUser, false));
             break;
             
         case '⚠️ Прервать турнир':
@@ -738,8 +769,12 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, '❌ Нет активного турнира!');
                 break;
             }
+            
+            // Удаляем все сообщения турнира
+            await deleteTournamentMessages();
+            
             currentTournament = null;
-            bot.sendMessage(chatId, '⚠️ Турнир прерван! Все данные потеряны.', getMainKeyboard(isAdminUser, false));
+            await bot.sendMessage(chatId, '⚠️ Турнир прерван! Все данные потеряны.', getMainKeyboard(isAdminUser, false));
             break;
             
         case '➕ Добавить команду':
@@ -809,7 +844,6 @@ bot.on('message', async (msg) => {
             break;
 
         default:
-
             if (text && !text.startsWith('/')) {}
             break;
     }
@@ -851,15 +885,18 @@ bot.on('callback_query', async (callbackQuery) => {
         const standings = getStandingsTable(stats);
         const liveStatus = getLiveStatus(currentTournament.matches);
         
-        bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
-        bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
+        const standingsMsg = await bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
+        const statusMsg = await bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
+        saveMessageId(chatId, standingsMsg.message_id);
+        saveMessageId(chatId, statusMsg.message_id);
         
         userStates.delete(userId);
         
         // Проверяем, завершен ли турнир
         const allCompleted = currentTournament.matches.every(m => m.completed);
         if (allCompleted) {
-            bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить" для подведения итогов.');
+            const completeMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить" для подведения итогов.');
+            saveMessageId(chatId, completeMsg.message_id);
         }
         
         await bot.answerCallbackQuery(callbackQuery.id);
