@@ -22,7 +22,7 @@
                 <span class="badge-dot"></span>
                 Работает в Telegram
             </div>
-            <h1>Турниры по FC и FIFA<br>без <span class="highlight">споров</span> и Excel</h1>
+            <h1>Организуйте офлайн-турнир <br> по <span class="highlight">EA Sports FC / FIFA</span></h1>
             <p class="hero-subtitle">
                 Добавьте бота в чат — и через две минуты начнёте турнир.
                 Жеребьёвка, расписание, подсчёт очков и статистика — всё автоматически.
@@ -35,20 +35,6 @@
                 <a href="#features" class="btn btn-ghost">
                     Как это работает
                 </a>
-            </div>
-            <div class="hero-stats">
-                <div class="stat">
-                    <div class="stat-number">43</div>
-                    <div class="stat-label">клуба</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">10</div>
-                    <div class="stat-label">сборных</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">2 мин</div>
-                    <div class="stat-label">до старта</div>
-                </div>
             </div>
         </div>
         <div class="hero-image">
@@ -119,7 +105,7 @@
             <div class="step">
                 <div class="step-num">03</div>
                 <h3>Играйте</h3>
-                <p>Жмите «🏆 Новый турнир». Бот распределит команды и составит расписание. Дальше — только футбол.</p>
+                <p>Начинайте новый турнир. Бот распределит команды и составит расписание. Дальше — только футбол.</p>
             </div>
         </div>
     </div>
@@ -271,55 +257,204 @@
         <div class="section-header">
             <span class="eyebrow">Из чата</span>
             <h2>Как это выглядит вживую</h2>
+            <p class="section-sub">Реальные сообщения из Telegram — без монтажа и скриншотов</p>
         </div>
         
         <div class="examples-grid">
-            <div class="example-card">
-                <div class="example-label">Жеребьёвка</div>
-                <div class="example-body">
-                    <div class="msg bot">
-                        <div class="msg-name">🎲 Жеребьёвка команд</div>
-                        <div class="msg-text">
-                            Владимир → 🇪🇸 Реал Мадрид<br>
-                            Нуриман → 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>
-                            Никита → 🇩🇪 Бавария
+            <!-- 1. Жеребьёвка -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">🎲 Жеребьёвка команд</div>
+                                <div class="msg-text-sm">
+                                    Владимир → 🇪🇸 Реал Мадрид<br>
+                                    Нуриман → 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>
+                                    Никита → 🇩🇪 Бавария
+                                </div>
+                            </div>
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">🏆 РАСПИСАНИЕ</div>
+                                <div class="msg-text-sm">
+                                    Владимир vs Нуриман<br>
+                                    Владимир vs Никита<br>
+                                    Нуриман vs Никита
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="example-caption">Жеребьёвка и расписание</div>
             </div>
             
-            <div class="example-card">
-                <div class="example-label">Таблица</div>
-                <div class="example-body">
-                    <div class="msg bot">
-                        <div class="msg-name">📊 Турнирная таблица</div>
-                        <div class="msg-text">
-                            🥇 Владимир (Реал Мадрид)<br>
-                            2 игр · 4 очка · голы 5:2 (+3)<br><br>
-                            🥈 Нуриман (Ман Сити)<br>
-                            2 игр · 2 очка · голы 3:3 (0)<br><br>
-                            🥉 Никита (Бавария)<br>
-                            2 игр · 0 очков · голы 1:4 (−3)
+            <!-- 2. Ввод счёта -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">📝 Введи счёт</div>
+                                <div class="msg-text-sm">
+                                    Владимир vs Нуриман<br>
+                                    Пример: 2:1 или 0:0
+                                </div>
+                            </div>
+                            <div class="msg-sm user">
+                                <div class="msg-text-sm">3:1</div>
+                            </div>
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">✅ Результат записан</div>
+                                <div class="msg-text-sm">
+                                    Владимир <strong>3:1</strong> Нуриман<br>
+                                    Победа в основное время
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="example-caption">Ввод счёта за 5 секунд</div>
             </div>
             
-            <div class="example-card">
-                <div class="example-label">Профиль</div>
-                <div class="example-body">
-                    <div class="msg bot">
-                        <div class="msg-name">👤 Владимир</div>
-                        <div class="msg-text">
-                            📈 #1 из 4 · 42 очка<br>
-                            🎮 25 матчей · 72% побед<br>
-                            ⚽️ Голы: 58:22 (+36)<br><br>
-                            🏅 Достижения:<br>
-                            🔥 Серия — 5 побед<br>
-                            💯 Ветеран — 50 матчей
+            <!-- 3. Таблица -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">📊 ТУРНИРНАЯ ТАБЛИЦА</div>
+                                <div class="msg-text-sm">
+                                    🥇 Владимир (Реал)<br>
+                                    2 игр · 4 очка · 5:2 (+3)<br><br>
+                                    🥈 Нуриман (Ман Сити)<br>
+                                    2 игр · 2 очка · 3:3 (0)<br><br>
+                                    🥉 Никита (Бавария)<br>
+                                    2 игр · 0 очков · 1:4 (−3)
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="example-caption">Таблица обновляется сама</div>
+            </div>
+            
+            <!-- 4. Профиль -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">👤 ПРОФИЛЬ: ВЛАДИМИР</div>
+                                <div class="msg-text-sm">
+                                    📈 #1 из 4 · 42 очка<br>
+                                    🎮 25 матчей · 72% побед<br>
+                                    ⚽️ Голы: 58:22 (+36)<br><br>
+                                    🏅 Достижения:<br>
+                                    🔥 Серия — 5 побед<br>
+                                    💯 Ветеран — 50 матчей
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="example-caption">Профиль игрока с ачивками</div>
+            </div>
+            
+            <!-- 5. Личные встречи -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">⚔️ ЛИЧНЫЕ ВСТРЕЧИ</div>
+                                <div class="msg-text-sm">
+                                    Владимир vs Нуриман<br><br>
+                                    📊 Всего: 8 матчей<br>
+                                    ✅ Владимир: 5<br>
+                                    ✅ Нуриман: 2<br>
+                                    🤝 Ничьих: 1<br><br>
+                                    ⚽️ Голы: 18:12
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="example-caption">Кто кого чаще бил</div>
+            </div>
+            
+            <!-- 6. Пенальти -->
+            <div class="example-phone">
+                <div class="phone-frame-sm">
+                    <div class="phone-notch-sm"></div>
+                    <div class="phone-screen-sm">
+                        <div class="chat-header-sm">
+                            <div class="chat-avatar-sm">⚽</div>
+                            <div class="chat-info-sm">
+                                <div class="chat-name-sm">Турнирный бот</div>
+                                <div class="chat-status-sm">онлайн</div>
+                            </div>
+                        </div>
+                        <div class="chat-body-sm">
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">⚽️ Ничья 1:1!</div>
+                                <div class="msg-text-sm">
+                                    Кто победил по пенальти?
+                                </div>
+                            </div>
+                            <div class="msg-sm user">
+                                <div class="msg-text-sm">Владимир</div>
+                            </div>
+                            <div class="msg-sm bot">
+                                <div class="msg-name-sm">✅ Результат записан</div>
+                                <div class="msg-text-sm">
+                                    Владимир 1:1 Нуриман<br>
+                                    🏆 Пенальти: Владимир
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="example-caption">Ничья? Бот спросит про пенальти</div>
             </div>
         </div>
     </div>
