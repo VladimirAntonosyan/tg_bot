@@ -11,6 +11,27 @@ const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
+    } else if (req.url === '/' || req.url === '/landing') {
+        // Отдаём лендинг
+        try {
+            const indexPath = path.join(__dirname, 'landing', 'index.html');
+            const html = fs.readFileSync(indexPath, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(html);
+        } catch (e) {
+            res.writeHead(500);
+            res.end('Landing not found');
+        }
+    } else if (req.url === '/style.css') {
+        try {
+            const cssPath = path.join(__dirname, 'landing', 'style.css');
+            const css = fs.readFileSync(cssPath, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
+            res.end(css);
+        } catch (e) {
+            res.writeHead(404);
+            res.end();
+        }
     } else {
         res.writeHead(404);
         res.end();
