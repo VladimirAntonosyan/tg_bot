@@ -20,7 +20,6 @@ server.listen(PORT, () => {
 
 require('dotenv').config();
 
-// Конфигурация
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!TOKEN) {
     console.error('❌ Укажи TELEGRAM_BOT_TOKEN в файле .env');
@@ -32,18 +31,13 @@ const TEAMS_FILE = path.join(__dirname, 'teams.json');
 const NATIONAL_TEAMS_FILE = path.join(__dirname, 'national_teams.json');
 const GLOBAL_STATS_FILE = path.join(__dirname, 'global_stats.json');
 
-// Хранилище состояний
 const userStates = new Map();
 const selectedParticipants = new Map();
-const tournamentMode = new Map(); // 'club' или 'world_cup'
+const tournamentMode = new Map();
 
-// Текущий активный турнир
 let currentTournament = null;
-
-// Хранилище ID сообщений турнира
 let tournamentMessages = [];
 
-// Список известных участников
 const KNOWN_PARTICIPANTS = [
     { id: 'vladimir', name: 'Владимир', username: 'antsn21' },
     { id: 'nuriman', name: 'Нуриман', username: 'bnm11' },
@@ -52,58 +46,46 @@ const KNOWN_PARTICIPANTS = [
     { id: 'denis', name: 'Денис', username: 'DenisMosman' }
 ];
 
-// Загрузка списка клубов
 function loadTeams() {
     try {
-        const data = fs.readFileSync(TEAMS_FILE, 'utf8');
-        return JSON.parse(data);
+        return JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
     } catch (error) {
-        console.error('Ошибка загрузки команд:', error);
         return [];
     }
 }
 
-// Сохранение списка клубов
 function saveTeams(teams) {
     fs.writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2));
 }
 
-// Загрузка списка сборных
 function loadNationalTeams() {
     try {
-        const data = fs.readFileSync(NATIONAL_TEAMS_FILE, 'utf8');
-        return JSON.parse(data);
+        return JSON.parse(fs.readFileSync(NATIONAL_TEAMS_FILE, 'utf8'));
     } catch (error) {
-        console.error('Ошибка загрузки сборных:', error);
         return [];
     }
 }
 
-// Загрузка глобальной статистики
 function loadGlobalStats() {
     try {
-        const data = fs.readFileSync(GLOBAL_STATS_FILE, 'utf8');
-        return JSON.parse(data);
+        return JSON.parse(fs.readFileSync(GLOBAL_STATS_FILE, 'utf8'));
     } catch (error) {
         return [];
     }
 }
 
-// Сохранение глобальной статистики
 function saveGlobalStats(stats) {
     fs.writeFileSync(GLOBAL_STATS_FILE, JSON.stringify(stats, null, 2));
 }
 
-// Запись результата матча в глобальную статистику
 function recordMatchToGlobalStats(match, participants, tournamentType) {
     const stats = loadGlobalStats();
-    
     const player1Data = participants.find(p => p.name === match.player1);
     const player2Data = participants.find(p => p.name === match.player2);
     
     const record = {
         date: new Date().toISOString(),
-        tournamentType: tournamentType, // 'club' или 'world_cup'
+        tournamentType: tournamentType,
         player1: match.player1,
         player2: match.player2,
         team1: player1Data ? player1Data.team : null,
@@ -117,7 +99,6 @@ function recordMatchToGlobalStats(match, participants, tournamentType) {
     saveGlobalStats(stats);
 }
 
-// Перемешивание массива
 function shuffleArray(arr) {
     const shuffled = [...arr];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -127,7 +108,6 @@ function shuffleArray(arr) {
     return shuffled;
 }
 
-// Проверка, является ли пользователь администратором чата
 async function isAdmin(chatId, userId) {
     try {
         const chatMember = await bot.getChatMember(chatId, userId);
@@ -137,24 +117,19 @@ async function isAdmin(chatId, userId) {
     }
 }
 
-// Сохранение ID сообщения
 function saveMessageId(chatId, messageId) {
     tournamentMessages.push({ chatId, messageId });
 }
 
-// Удаление всех сообщений турнира
 async function deleteTournamentMessages() {
     for (const msg of tournamentMessages) {
         try {
             await bot.deleteMessage(msg.chatId, msg.messageId);
-        } catch (error) {
-            // Игнорируем ошибки
-        }
+        } catch (error) {}
     }
     tournamentMessages = [];
 }
 
-// Генерация расписания матчей (каждый с каждым)
 function generateSchedule(participants) {
     const matches = [];
     let id = 1;
@@ -174,35 +149,22 @@ function generateSchedule(participants) {
     return matches;
 }
 
-// Подсчет статистики участников турнира
 function calculateStats(participants, matches) {
     const stats = {};
-    
     participants.forEach(p => {
         stats[p.name] = {
-            name: p.name,
-            team: p.team,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            wins: 0,
-            penaltyWins: 0,
-            penaltyLosses: 0,
-            draws: 0,
-            losses: 0,
-            points: 0,
-            matchesPlayed: 0
+            name: p.name, team: p.team, goalsFor: 0, goalsAgainst: 0,
+            wins: 0, penaltyWins: 0, penaltyLosses: 0, draws: 0, losses: 0,
+            points: 0, matchesPlayed: 0
         };
     });
     
     matches.forEach(match => {
         if (!match.completed) return;
-        
         const p1 = stats[match.player1];
         const p2 = stats[match.player2];
-        
         p1.matchesPlayed++;
         p2.matchesPlayed++;
-        
         p1.goalsFor += match.score1;
         p1.goalsAgainst += match.score2;
         p2.goalsFor += match.score2;
@@ -210,117 +172,188 @@ function calculateStats(participants, matches) {
         
         if (match.penalties) {
             if (match.penalties === match.player1) {
-                p1.penaltyWins++;
-                p2.penaltyLosses++;
-                p1.points += 2;
-                p2.points += 1;
+                p1.penaltyWins++; p2.penaltyLosses++;
+                p1.points += 2; p2.points += 1;
             } else {
-                p1.penaltyLosses++;
-                p2.penaltyWins++;
-                p1.points += 1;
-                p2.points += 2;
+                p1.penaltyLosses++; p2.penaltyWins++;
+                p1.points += 1; p2.points += 2;
             }
         } else if (match.score1 > match.score2) {
-            p1.wins++;
-            p2.losses++;
-            p1.points += 2;
+            p1.wins++; p2.losses++; p1.points += 2;
         } else if (match.score2 > match.score1) {
-            p2.wins++;
-            p1.losses++;
-            p2.points += 2;
+            p2.wins++; p1.losses++; p2.points += 2;
         } else {
-            p1.draws++;
-            p2.draws++;
-            p1.points += 1;
-            p2.points += 1;
+            p1.draws++; p2.draws++; p1.points += 1; p2.points += 1;
         }
     });
     
     return Object.values(stats);
 }
 
-// Подсчет глобального рейтинга всех игроков
 function calculateGlobalStats() {
     const records = loadGlobalStats();
     const playerStats = {};
     
-    // Инициализация всех известных игроков
     KNOWN_PARTICIPANTS.forEach(p => {
         playerStats[p.name] = {
-            name: p.name,
-            matchesPlayed: 0,
-            wins: 0,
-            losses: 0,
-            draws: 0,
-            penaltyWins: 0,
-            penaltyLosses: 0,
-            points: 0,
-            goalsFor: 0,
-            goalsAgainst: 0
+            name: p.name, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
+            penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
         };
     });
     
     records.forEach(record => {
-        // Игрок 1
         if (!playerStats[record.player1]) {
             playerStats[record.player1] = {
-                name: record.player1, matchesPlayed: 0, wins: 0, losses: 0,
-                draws: 0, penaltyWins: 0, penaltyLosses: 0, points: 0,
-                goalsFor: 0, goalsAgainst: 0
+                name: record.player1, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
+                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
             };
         }
-        // Игрок 2
         if (!playerStats[record.player2]) {
             playerStats[record.player2] = {
-                name: record.player2, matchesPlayed: 0, wins: 0, losses: 0,
-                draws: 0, penaltyWins: 0, penaltyLosses: 0, points: 0,
-                goalsFor: 0, goalsAgainst: 0
+                name: record.player2, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
+                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
             };
         }
         
         const p1 = playerStats[record.player1];
         const p2 = playerStats[record.player2];
         
-        p1.matchesPlayed++;
-        p2.matchesPlayed++;
-        
-        p1.goalsFor += record.score1;
-        p1.goalsAgainst += record.score2;
-        p2.goalsFor += record.score2;
-        p2.goalsAgainst += record.score1;
+        p1.matchesPlayed++; p2.matchesPlayed++;
+        p1.goalsFor += record.score1; p1.goalsAgainst += record.score2;
+        p2.goalsFor += record.score2; p2.goalsAgainst += record.score1;
         
         if (record.penalties) {
             if (record.penalties === record.player1) {
-                p1.penaltyWins++;
-                p2.penaltyLosses++;
-                p1.points += 2;
-                p2.points += 1;
+                p1.penaltyWins++; p2.penaltyLosses++;
+                p1.points += 2; p2.points += 1;
             } else {
-                p1.penaltyLosses++;
-                p2.penaltyWins++;
-                p1.points += 1;
-                p2.points += 2;
+                p1.penaltyLosses++; p2.penaltyWins++;
+                p1.points += 1; p2.points += 2;
             }
         } else if (record.score1 > record.score2) {
-            p1.wins++;
-            p2.losses++;
-            p1.points += 2;
+            p1.wins++; p2.losses++; p1.points += 2;
         } else if (record.score2 > record.score1) {
-            p2.wins++;
-            p1.losses++;
-            p2.points += 2;
+            p2.wins++; p1.losses++; p2.points += 2;
         } else {
-            p1.draws++;
-            p2.draws++;
-            p1.points += 1;
-            p2.points += 1;
+            p1.draws++; p2.draws++; p1.points += 1; p2.points += 1;
         }
     });
     
     return Object.values(playerStats);
 }
 
-// Получение таблицы турнира
+function getHeadToHeadStats(player1Name, player2Name) {
+    const records = loadGlobalStats();
+    const matches = records.filter(r => 
+        (r.player1 === player1Name && r.player2 === player2Name) ||
+        (r.player1 === player2Name && r.player2 === player1Name)
+    );
+    
+    if (matches.length === 0) return null;
+    
+    let p1Wins = 0, p2Wins = 0, draws = 0;
+    let p1PenaltyWins = 0, p2PenaltyWins = 0;
+    let p1Goals = 0, p2Goals = 0;
+    const recentMatches = [];
+    
+    matches.forEach(m => {
+        let scoreForP1, scoreForP2;
+        if (m.player1 === player1Name) {
+            scoreForP1 = m.score1;
+            scoreForP2 = m.score2;
+        } else {
+            scoreForP1 = m.score2;
+            scoreForP2 = m.score1;
+        }
+        
+        p1Goals += scoreForP1;
+        p2Goals += scoreForP2;
+        
+        if (m.penalties) {
+            if (m.penalties === player1Name) {
+                p1Wins++; p1PenaltyWins++;
+            } else {
+                p2Wins++; p2PenaltyWins++;
+            }
+        } else if (scoreForP1 > scoreForP2) {
+            p1Wins++;
+        } else if (scoreForP2 > scoreForP1) {
+            p2Wins++;
+        } else {
+            draws++;
+        }
+        
+        recentMatches.push({
+            date: m.date,
+            player1: m.player1,
+            player2: m.player2,
+            score1: m.score1,
+            score2: m.score2,
+            penalties: m.penalties
+        });
+    });
+    
+    recentMatches.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    return {
+        totalMatches: matches.length,
+        p1Wins, p2Wins, draws,
+        p1PenaltyWins, p2PenaltyWins,
+        p1Goals, p2Goals,
+        recentMatches: recentMatches.slice(0, 5)
+    };
+}
+
+function formatHeadToHead(player1Name, player2Name, stats) {
+    if (!stats) {
+        return `⚔️ <b>${player1Name} vs ${player2Name}</b>\n\n❌ Эти игроки еще не встречались!`;
+    }
+    
+    const totalGoals = stats.p1Goals + stats.p2Goals;
+    
+    let message = `⚔️ <b>ЛИЧНЫЕ ВСТРЕЧИ</b>\n\n`;
+    message += `<b>${player1Name}</b> vs <b>${player2Name}</b>\n\n`;
+    message += `<b>📊 ВСЕГО МАТЧЕЙ:</b> ${stats.totalMatches}\n`;
+    message += `✅ ${player1Name} побед: ${stats.p1Wins}\n`;
+    message += `✅ ${player2Name} побед: ${stats.p2Wins}\n`;
+    message += `🤝 Ничьих: ${stats.draws}\n\n`;
+    
+    if (stats.p1PenaltyWins > 0 || stats.p2PenaltyWins > 0) {
+        message += `<b>🥅 ПОБЕДЫ ПО ПЕНАЛЬТИ:</b>\n`;
+        message += `• ${player1Name}: ${stats.p1PenaltyWins}\n`;
+        message += `• ${player2Name}: ${stats.p2PenaltyWins}\n\n`;
+    }
+    
+    message += `<b>⚽️ ГОЛЫ:</b>\n`;
+    message += `${player1Name}: ${stats.p1Goals}\n`;
+    message += `${player2Name}: ${stats.p2Goals}\n`;
+    message += `Всего: ${totalGoals} (в среднем ${(totalGoals / stats.totalMatches).toFixed(1)} за матч)\n\n`;
+    
+    message += `<b>📜 ПОСЛЕДНИЕ МАТЧИ:</b>\n\n`;
+    stats.recentMatches.forEach((m, idx) => {
+        const date = new Date(m.date).toLocaleDateString('ru-RU');
+        let resultEmoji = '🤝';
+        if (m.penalties) {
+            resultEmoji = m.penalties === player1Name ? '✅' : '❌';
+        } else {
+            let s1, s2;
+            if (m.player1 === player1Name) {
+                s1 = m.score1; s2 = m.score2;
+            } else {
+                s1 = m.score2; s2 = m.score1;
+            }
+            if (s1 > s2) resultEmoji = '✅';
+            else if (s2 > s1) resultEmoji = '❌';
+        }
+        
+        let matchLine = `${resultEmoji} ${date}: ${m.player1} ${m.score1}:${m.score2} ${m.player2}`;
+        if (m.penalties) matchLine += ` (пен. ${m.penalties})`;
+        message += `${idx + 1}. ${matchLine}\n`;
+    });
+    
+    return message;
+}
+
 function getStandingsTable(stats) {
     const sorted = [...stats].sort((a, b) => {
         if (a.points !== b.points) return b.points - a.points;
@@ -338,15 +371,11 @@ function getStandingsTable(stats) {
         table += `${medal}${s.name} (${s.team})\n`;
         table += `   ${s.matchesPlayed} игр · ${s.points} очков · голы ${s.goalsFor}:${s.goalsAgainst} (${diffText})\n\n`;
     });
-    
     return table;
 }
 
-// Получение общего рейтинга игроков
 function getGlobalRatingTable() {
     const stats = calculateGlobalStats();
-    
-    // Сортировка по очкам, затем по победам, затем по разнице голов
     const sorted = [...stats].sort((a, b) => {
         if (a.points !== b.points) return b.points - a.points;
         if (a.wins !== b.wins) return b.wins - a.wins;
@@ -356,41 +385,32 @@ function getGlobalRatingTable() {
     });
     
     let table = '<b>📈 ОБЩИЙ РЕЙТИНГ ИГРОКОВ</b>\n\n';
-    
     sorted.forEach((s, idx) => {
         const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
         table += `${medal}<b>${s.name}</b> — ${s.points} очков\n`;
         table += `   🎮 Матчей: ${s.matchesPlayed}\n`;
         table += `   ✅ Побед: ${s.wins} | ❌ Поражений: ${s.losses} | 🤝 Ничьих: ${s.draws}\n`;
-        table += `   🥅 Пенальти: ${s.penaltyWins} побед / ${s.penaltyLosses} поражений\n`;
+        table += `   🥅 Пенальти: ${s.penaltyWins} / ${s.penaltyLosses}\n`;
         table += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst} (${s.goalsFor - s.goalsAgainst >= 0 ? '+' : ''}${s.goalsFor - s.goalsAgainst})\n\n`;
     });
-    
     return table;
 }
 
-// Live-статус турнира
 function getLiveStatus(matches) {
     const completed = matches.filter(m => m.completed).length;
     const total = matches.length;
     const remaining = matches.filter(m => !m.completed);
     
-    let status = `<b>🏟 LIVE СТАТУС ТУРНИРА</b>\n\n`;
-    status += `📊 Сыграно матчей: ${completed} из ${total}\n`;
-    
+    let status = `<b>🏟 LIVE СТАТУС</b>\n\n📊 Сыграно: ${completed} из ${total}\n`;
     if (remaining.length > 0) {
-        status += `\n<b>📅 Осталось матчей (${remaining.length}):</b>\n`;
-        remaining.forEach(m => {
-            status += `• ${m.player1} vs ${m.player2}\n`;
-        });
+        status += `\n<b>📅 Осталось (${remaining.length}):</b>\n`;
+        remaining.forEach(m => { status += `• ${m.player1} vs ${m.player2}\n`; });
     } else {
-        status += `\n✅ Все матчи сыграны! Нажми "🏆 Завершить" для подведения итогов.\n`;
+        status += `\n✅ Все матчи сыграны! Нажми "🏆 Завершить".\n`;
     }
-    
     return status;
 }
 
-// Главное меню
 function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     if (isTournamentActive) {
         const keyboard = [
@@ -398,112 +418,142 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
             [{ text: '✏️ Редактировать' }, { text: '🏆 Завершить' }],
             [{ text: '⚠️ Прервать турнир' }, { text: '❓ Помощь' }]
         ];
-        return { reply_markup: { keyboard: keyboard, resize_keyboard: true, persistent: true } };
+        return { reply_markup: { keyboard, resize_keyboard: true, persistent: true } };
     }
     
     const keyboard = [
         [{ text: '🏆 Новый турнир' }, { text: '📋 Список команд' }],
-        [{ text: '📈 Общий рейтинг' }, { text: '❓ Помощь' }]
+        [{ text: '📈 Общий рейтинг' }, { text: '⚔️ Личные встречи' }],
+        [{ text: '❓ Помощь' }]
     ];
     
     if (isAdminUser) {
         keyboard.push([{ text: '➕ Добавить команду' }, { text: '❌ Удалить команду' }]);
     }
     
-    return { reply_markup: { keyboard: keyboard, resize_keyboard: true, persistent: true } };
+    return { reply_markup: { keyboard, resize_keyboard: true, persistent: true } };
 }
 
-// Клавиатура выбора участников турнира (с чекбоксом ЧЕМПИОНАТ МИРА)
 function createTournamentSelectionKeyboard(selectedIds = [], worldCupMode = false) {
     const inlineKeyboard = [];
     let row = [];
-    
     for (const participant of KNOWN_PARTICIPANTS) {
         const isSelected = selectedIds.includes(participant.id);
         const buttonText = isSelected ? `✅ ${participant.name}` : `⬜️ ${participant.name}`;
-        const callbackData = `tournament_toggle_${participant.id}`;
-        
-        row.push({ text: buttonText, callback_data: callbackData });
-        
-        if (row.length === 2) {
-            inlineKeyboard.push(row);
-            row = [];
-        }
+        row.push({ text: buttonText, callback_data: `tournament_toggle_${participant.id}` });
+        if (row.length === 2) { inlineKeyboard.push(row); row = []; }
     }
+    if (row.length > 0) inlineKeyboard.push(row);
     
-    if (row.length > 0) {
-        inlineKeyboard.push(row);
-    }
-    
-    // Чекбокс ЧЕМПИОНАТ МИРА
-    const worldCupButton = worldCupMode 
-        ? '✅ ЧЕМПИОНАТ МИРА (сборные)' 
-        : '⬜️ ЧЕМПИОНАТ МИРА (сборные)';
+    const worldCupButton = worldCupMode ? '✅ ЧЕМПИОНАТ МИРА (сборные)' : '⬜️ ЧЕМПИОНАТ МИРА (сборные)';
     inlineKeyboard.push([{ text: worldCupButton, callback_data: 'toggle_world_cup' }]);
-    
     inlineKeyboard.push([{ text: '🎲 Начать турнир', callback_data: 'tournament_start' }]);
     inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'tournament_cancel' }]);
     
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
-// Клавиатура выбора матча для записи результата
 function createMatchSelectionKeyboard(matches) {
     const inlineKeyboard = [];
-    const incompleteMatches = matches.filter(m => !m.completed);
-    
-    incompleteMatches.forEach(match => {
-        inlineKeyboard.push([{ 
-            text: `${match.player1} vs ${match.player2}`, 
-            callback_data: `record_match_${match.id}` 
-        }]);
+    matches.filter(m => !m.completed).forEach(match => {
+        inlineKeyboard.push([{ text: `${match.player1} vs ${match.player2}`, callback_data: `record_match_${match.id}` }]);
     });
-    
     inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'cancel_record' }]);
-    
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
-// Клавиатура выбора матча для редактирования
 function createEditMatchSelectionKeyboard(matches) {
     const inlineKeyboard = [];
-    const completedMatches = matches.filter(m => m.completed);
+    const completed = matches.filter(m => m.completed);
+    if (completed.length === 0) return null;
     
-    if (completedMatches.length === 0) return null;
-    
-    completedMatches.forEach(match => {
-        const scoreText = `${match.player1} ${match.score1}:${match.score2} ${match.player2}`;
-        inlineKeyboard.push([{ 
-            text: scoreText, 
-            callback_data: `edit_match_${match.id}` 
-        }]);
+    completed.forEach(match => {
+        inlineKeyboard.push([{ text: `${match.player1} ${match.score1}:${match.score2} ${match.player2}`, callback_data: `edit_match_${match.id}` }]);
     });
-    
     inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'cancel_edit' }]);
-    
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
-// Команда /start
+function createH2HFirstPlayerKeyboard() {
+    const inlineKeyboard = [];
+    let row = [];
+    for (const participant of KNOWN_PARTICIPANTS) {
+        row.push({ text: participant.name, callback_data: `h2h_first_${participant.name}` });
+        if (row.length === 2) { inlineKeyboard.push(row); row = []; }
+    }
+    if (row.length > 0) inlineKeyboard.push(row);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'h2h_cancel' }]);
+    return { reply_markup: { inline_keyboard: inlineKeyboard } };
+}
+
+function createH2HSecondPlayerKeyboard(firstPlayerName) {
+    const inlineKeyboard = [];
+    let row = [];
+    for (const participant of KNOWN_PARTICIPANTS) {
+        if (participant.name === firstPlayerName) continue;
+        row.push({ text: participant.name, callback_data: `h2h_second_${firstPlayerName}__${participant.name}` });
+        if (row.length === 2) { inlineKeyboard.push(row); row = []; }
+    }
+    if (row.length > 0) inlineKeyboard.push(row);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'h2h_cancel' }]);
+    return { reply_markup: { inline_keyboard: inlineKeyboard } };
+}
+
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    
     isAdmin(chatId, userId).then(isAdminUser => {
         bot.sendMessage(chatId, 
-            '🎯 *Добро пожаловать в Турнирного бота!*\n\nИспользуй кнопки ниже для управления.\n\nИзвестные участники: Владимир, Нуриман, Никита, Станислав, Денис',
+            '🎯 *Турнирный бот*\n\nИспользуй кнопки ниже.',
             { parse_mode: 'Markdown', ...getMainKeyboard(isAdminUser, !!currentTournament) }
         );
     });
 });
 
-// Обработка callback-запросов
 bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
     const messageId = callbackQuery.message.message_id;
     
+    // H2H - выбор первого
+    if (data.startsWith('h2h_first_')) {
+        const firstPlayer = data.replace('h2h_first_', '');
+        await bot.editMessageText(
+            `⚔️ <b>ЛИЧНЫЕ ВСТРЕЧИ</b>\n\nПервый игрок: <b>${firstPlayer}</b>\n\nТеперь выбери второго:`,
+            { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', ...createH2HSecondPlayerKeyboard(firstPlayer) }
+        );
+        saveMessageId(chatId, messageId);
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    
+    // H2H - выбор второго
+    if (data.startsWith('h2h_second_')) {
+        const rest = data.replace('h2h_second_', '');
+        const [firstPlayer, secondPlayer] = rest.split('__');
+        
+        const stats = getHeadToHeadStats(firstPlayer, secondPlayer);
+        const message = formatHeadToHead(firstPlayer, secondPlayer, stats);
+        
+        await bot.editMessageText(message, {
+            chat_id: chatId, message_id: messageId, parse_mode: 'HTML'
+        });
+        saveMessageId(chatId, messageId);
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    
+    // H2H - отмена
+    if (data === 'h2h_cancel') {
+        await bot.editMessageText('❌ Личные встречи отменены', {
+            chat_id: chatId, message_id: messageId
+        });
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    
+    // Обработка турнира
     if (data.startsWith('tournament_toggle_')) {
         const participantId = data.replace('tournament_toggle_', '');
         const selectionKey = `tournament_${chatId}`;
@@ -524,75 +574,60 @@ bot.on('callback_query', async (callbackQuery) => {
         
         selectedParticipants.set(selectionKey, selected);
         const worldCup = tournamentMode.get(chatId) || false;
-        
         const selectedNames = selected.map(id => {
             const p = KNOWN_PARTICIPANTS.find(part => part.id === id);
             return p ? p.name : id;
         });
         
         let statusText = selected.length > 0 
-            ? `👥 Выбрано участников: ${selected.length}\n\n✅ ${selectedNames.join(', ')}\n\n` 
-            : `👥 Выбери участников турнира (от 2 до 5 человек):\n\n`;
-        
-        statusText += `Режим: ${worldCup ? '🌍 ЧЕМПИОНАТ МИРА (сборные)' : '⚽ Клубный турнир'}\n\n`;
-        statusText += `━━━━━━━━━━━━━━━━━\nНажми "🎲 Начать турнир" для жеребьевки команд и создания расписания.`;
+            ? `👥 Выбрано: ${selected.length}\n\n✅ ${selectedNames.join(', ')}\n\n` 
+            : `👥 Выбери участников (от 2 до 5):\n\n`;
+        statusText += `Режим: ${worldCup ? '🌍 ЧМ (сборные)' : '⚽ Клубы'}`;
         
         await bot.editMessageText(statusText, {
-            chat_id: chatId,
-            message_id: messageId,
+            chat_id: chatId, message_id: messageId,
             ...createTournamentSelectionKeyboard(selected, worldCup)
         });
         saveMessageId(chatId, messageId);
-        
     } else if (data === 'toggle_world_cup') {
         const currentMode = tournamentMode.get(chatId) || false;
         tournamentMode.set(chatId, !currentMode);
-        
         await bot.answerCallbackQuery(callbackQuery.id, { 
-            text: !currentMode ? '🌍 Режим ЧЕМПИОНАТ МИРА включен' : '⚽ Режим клубного турнира' 
+            text: !currentMode ? '🌍 Режим ЧМ' : '⚽ Клубы' 
         });
         
         const selectionKey = `tournament_${chatId}`;
         const selected = selectedParticipants.get(selectionKey) || [];
-        
         const selectedNames = selected.map(id => {
             const p = KNOWN_PARTICIPANTS.find(part => part.id === id);
             return p ? p.name : id;
         });
         
         let statusText = selected.length > 0 
-            ? `👥 Выбрано участников: ${selected.length}\n\n✅ ${selectedNames.join(', ')}\n\n` 
-            : `👥 Выбери участников турнира (от 2 до 5 человек):\n\n`;
-        
-        statusText += `Режим: ${!currentMode ? '🌍 ЧЕМПИОНАТ МИРА (сборные)' : '⚽ Клубный турнир'}\n\n`;
-        statusText += `━━━━━━━━━━━━━━━━━\nНажми "🎲 Начать турнир" для жеребьевки команд и создания расписания.`;
+            ? `👥 Выбрано: ${selected.length}\n\n✅ ${selectedNames.join(', ')}\n\n` 
+            : `👥 Выбери участников (от 2 до 5):\n\n`;
+        statusText += `Режим: ${!currentMode ? '🌍 ЧМ (сборные)' : '⚽ Клубы'}`;
         
         await bot.editMessageText(statusText, {
-            chat_id: chatId,
-            message_id: messageId,
+            chat_id: chatId, message_id: messageId,
             ...createTournamentSelectionKeyboard(selected, !currentMode)
         });
         saveMessageId(chatId, messageId);
-        
     } else if (data === 'tournament_start') {
         const selectionKey = `tournament_${chatId}`;
         const selected = selectedParticipants.get(selectionKey) || [];
         const worldCup = tournamentMode.get(chatId) || false;
         
         if (selected.length < 2) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Выбери минимум 2 участника!' });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Минимум 2 участника!' });
             return;
         }
         
-        // Выбираем источник команд в зависимости от режима
         const teams = worldCup ? loadNationalTeams() : loadTeams();
-        
         if (teams.length < selected.length) {
-            await bot.editMessageText(`❌ Недостаточно ${worldCup ? 'сборных' : 'команд'}! Нужно: ${selected.length}, доступно: ${teams.length}.`, {
-                chat_id: chatId,
-                message_id: messageId
+            await bot.editMessageText(`❌ Недостаточно команд!`, {
+                chat_id: chatId, message_id: messageId
             });
-            saveMessageId(chatId, messageId);
             selectedParticipants.delete(selectionKey);
             tournamentMode.delete(chatId);
             return;
@@ -601,43 +636,28 @@ bot.on('callback_query', async (callbackQuery) => {
         const shuffledTeams = shuffleArray(teams);
         const participants = selected.map((id, idx) => {
             const participant = KNOWN_PARTICIPANTS.find(p => p.id === id);
-            return {
-                name: participant.name,
-                team: shuffledTeams[idx % shuffledTeams.length]
-            };
+            return { name: participant.name, team: shuffledTeams[idx % shuffledTeams.length] };
         });
         
         const matches = generateSchedule(participants);
-        
         currentTournament = {
             active: true,
             type: worldCup ? 'world_cup' : 'club',
-            participants: participants,
-            matches: matches,
+            participants, matches,
             createdAt: new Date().toISOString()
         };
         
         const modeEmoji = worldCup ? '🌍' : '⚽';
         const modeText = worldCup ? 'ЧЕМПИОНАТ МИРА' : 'КЛУБНЫЙ ТУРНИР';
         
-        let drawMessage = `<b>${modeEmoji} ${modeText}</b>\n\n`;
-        drawMessage += '<b>🎲 Жеребьевка команд:</b>\n\n';
-        participants.forEach(p => {
-            drawMessage += `${p.name} → ${p.team}\n`;
-        });
-        
-        drawMessage += '\n<b>🏆 РАСПИСАНИЕ МАТЧЕЙ:</b>\n\n';
-        matches.forEach(match => {
-            drawMessage += `${match.player1} vs ${match.player2}\n`;
-        });
-        
-        drawMessage += `\n<b>🏟 Статус:</b> Сыграно 0 из ${matches.length} матчей\n`;
-        drawMessage += `\nИспользуй кнопки ниже для записи результатов!`;
+        let drawMessage = `<b>${modeEmoji} ${modeText}</b>\n\n<b>🎲 Жеребьевка:</b>\n\n`;
+        participants.forEach(p => { drawMessage += `${p.name} → ${p.team}\n`; });
+        drawMessage += '\n<b>🏆 РАСПИСАНИЕ:</b>\n\n';
+        matches.forEach(m => { drawMessage += `${m.player1} vs ${m.player2}\n`; });
+        drawMessage += `\n<b>🏟 Статус:</b> 0 из ${matches.length} матчей`;
         
         await bot.editMessageText(drawMessage, {
-            chat_id: chatId,
-            message_id: messageId,
-            parse_mode: 'HTML'
+            chat_id: chatId, message_id: messageId, parse_mode: 'HTML'
         });
         saveMessageId(chatId, messageId);
         
@@ -645,452 +665,301 @@ bot.on('callback_query', async (callbackQuery) => {
         tournamentMode.delete(chatId);
         
         const isAdminUser = await isAdmin(chatId, userId);
-        const confirmMsg = await bot.sendMessage(chatId, `✅ Турнир (${modeText.toLowerCase()}) создан!`, 
-            getMainKeyboard(isAdminUser, true));
+        const confirmMsg = await bot.sendMessage(chatId, `✅ Турнир создан!`, getMainKeyboard(isAdminUser, true));
         saveMessageId(chatId, confirmMsg.message_id);
-        
     } else if (data === 'tournament_cancel') {
-        const selectionKey = `tournament_${chatId}`;
-        selectedParticipants.delete(selectionKey);
+        selectedParticipants.delete(`tournament_${chatId}`);
         tournamentMode.delete(chatId);
-        
-        await bot.editMessageText('❌ Создание турнира отменено', {
-            chat_id: chatId,
-            message_id: messageId
-        });
-        
+        await bot.editMessageText('❌ Отменено', { chat_id: chatId, message_id: messageId });
         const isAdminUser = await isAdmin(chatId, userId);
-        bot.sendMessage(chatId, 'Возврат в главное меню', getMainKeyboard(isAdminUser, false));
-        
+        bot.sendMessage(chatId, 'Главное меню', getMainKeyboard(isAdminUser, false));
     } else if (data.startsWith('record_match_')) {
         const matchId = parseInt(data.replace('record_match_', ''));
-        
         if (!currentTournament || !currentTournament.active) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Нет активного турнира!' });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Нет турнира!' });
             return;
         }
-        
         const match = currentTournament.matches.find(m => m.id === matchId);
         if (!match || match.completed) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч уже завершен!' });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч завершен!' });
             return;
         }
-        
-        userStates.set(userId, { action: 'waiting_for_score', matchId: matchId });
-        await bot.editMessageText(`📝 Введи счет основного времени для матча:\n${match.player1} vs ${match.player2}\n\nПример: 2:1 или 0:0`, {
-            chat_id: chatId,
-            message_id: messageId
+        userStates.set(userId, { action: 'waiting_for_score', matchId });
+        await bot.editMessageText(`📝 Введи счет:\n${match.player1} vs ${match.player2}`, {
+            chat_id: chatId, message_id: messageId
         });
         saveMessageId(chatId, messageId);
-        
     } else if (data.startsWith('edit_match_')) {
         const matchId = parseInt(data.replace('edit_match_', ''));
-        
-        if (!currentTournament || !currentTournament.active) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Нет активного турнира!' });
-            return;
-        }
-        
+        if (!currentTournament) return;
         const match = currentTournament.matches.find(m => m.id === matchId);
         if (!match || !match.completed) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч еще не завершен!' });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч не завершен!' });
             return;
         }
-        
-        userStates.set(userId, { action: 'editing_score', matchId: matchId });
-        await bot.editMessageText(`✏️ Введи новый счет для матча:\n${match.player1} vs ${match.player2}\n\nТекущий: ${match.score1}:${match.score2}`, {
-            chat_id: chatId,
-            message_id: messageId
+        userStates.set(userId, { action: 'editing_score', matchId });
+        await bot.editMessageText(`✏️ Новый счет:\n${match.player1} vs ${match.player2}\nТекущий: ${match.score1}:${match.score2}`, {
+            chat_id: chatId, message_id: messageId
         });
         saveMessageId(chatId, messageId);
-        
     } else if (data === 'cancel_record' || data === 'cancel_edit') {
         userStates.delete(userId);
-        await bot.editMessageText('❌ Операция отменена', {
-            chat_id: chatId,
-            message_id: messageId
-        });
+        await bot.editMessageText('❌ Отменено', { chat_id: chatId, message_id: messageId });
     }
     
     await bot.answerCallbackQuery(callbackQuery.id);
 });
 
-// Обработка текстовых сообщений
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
     const userId = msg.from.id;
-    
     const userState = userStates.get(userId);
     
-    // Ввод счета
     if (userState && (userState.action === 'waiting_for_score' || userState.action === 'editing_score')) {
-        const scoreRegex = /^(\d+)[:\s\-](\d+)$/;
-        const match = scoreRegex.exec(text);
-        
+        const match = /^(\d+)[:\s\-](\d+)$/.exec(text);
         if (!match) {
-            const errorMsg = await bot.sendMessage(chatId, '❌ Неверный формат! Примеры: 2:1, 2 1, 2-1');
-            saveMessageId(chatId, errorMsg.message_id);
+            const err = await bot.sendMessage(chatId, '❌ Формат: 2:1, 2 1, 2-1');
+            saveMessageId(chatId, err.message_id);
             return;
         }
-        
         const score1 = parseInt(match[1]);
         const score2 = parseInt(match[2]);
-        
-        const tournamentMatch = currentTournament.matches.find(m => m.id === userState.matchId);
-        if (!tournamentMatch) {
-            bot.sendMessage(chatId, '❌ Матч не найден!');
-            userStates.delete(userId);
-            return;
-        }
+        const tm = currentTournament.matches.find(m => m.id === userState.matchId);
+        if (!tm) { userStates.delete(userId); return; }
         
         if (score1 === score2) {
-            userStates.set(userId, { 
-                action: 'waiting_for_penalty', 
-                matchId: userState.matchId, 
-                score1: score1, 
-                score2: score2
-            });
-            
+            userStates.set(userId, { action: 'waiting_for_penalty', matchId: userState.matchId, score1, score2 });
             const keyboard = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: tournamentMatch.player1, callback_data: `penalty_${tournamentMatch.player1}` }],
-                        [{ text: tournamentMatch.player2, callback_data: `penalty_${tournamentMatch.player2}` }]
+                        [{ text: tm.player1, callback_data: `penalty_${tm.player1}` }],
+                        [{ text: tm.player2, callback_data: `penalty_${tm.player2}` }]
                     ]
                 }
             };
-            
-            const penaltyMsg = await bot.sendMessage(chatId, `⚽️ Ничья ${score1}:${score2}!\n\nКто победил по пенальти?`, keyboard);
-            saveMessageId(chatId, penaltyMsg.message_id);
+            const pMsg = await bot.sendMessage(chatId, `⚽️ Ничья ${score1}:${score2}!\nКто победил по пенальти?`, keyboard);
+            saveMessageId(chatId, pMsg.message_id);
         } else {
-            tournamentMatch.score1 = score1;
-            tournamentMatch.score2 = score2;
-            tournamentMatch.penalties = null;
-            tournamentMatch.completed = true;
+            tm.score1 = score1;
+            tm.score2 = score2;
+            tm.penalties = null;
+            tm.completed = true;
+            recordMatchToGlobalStats(tm, currentTournament.participants, currentTournament.type);
             
-            // Записываем в глобальную статистику
-            recordMatchToGlobalStats(tournamentMatch, currentTournament.participants, currentTournament.type);
-            
-            const resultMsg = await bot.sendMessage(chatId, `✅ Результат записан!\n\n${tournamentMatch.player1} ${score1}:${score2} ${tournamentMatch.player2}\n🏆 Победа в основное время`);
-            saveMessageId(chatId, resultMsg.message_id);
+            const resMsg = await bot.sendMessage(chatId, `✅ ${tm.player1} ${score1}:${score2} ${tm.player2}`);
+            saveMessageId(chatId, resMsg.message_id);
             
             const stats = calculateStats(currentTournament.participants, currentTournament.matches);
-            const standings = getStandingsTable(stats);
-            const liveStatus = getLiveStatus(currentTournament.matches);
-            
-            const standingsMsg = await bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
-            const statusMsg = await bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
-            saveMessageId(chatId, standingsMsg.message_id);
-            saveMessageId(chatId, statusMsg.message_id);
+            const sMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
+            const lMsg = await bot.sendMessage(chatId, getLiveStatus(currentTournament.matches), { parse_mode: 'HTML' });
+            saveMessageId(chatId, sMsg.message_id);
+            saveMessageId(chatId, lMsg.message_id);
             
             userStates.delete(userId);
-            
-            const allCompleted = currentTournament.matches.every(m => m.completed);
-            if (allCompleted) {
-                const completeMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить".');
-                saveMessageId(chatId, completeMsg.message_id);
+            if (currentTournament.matches.every(m => m.completed)) {
+                const cMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "Завершить".');
+                saveMessageId(chatId, cMsg.message_id);
             }
         }
         return;
     }
     
-    // Добавление команды
-    const userDialogState = userStates.get(userId);
-    if (userDialogState && userDialogState.action === 'waiting_for_team_name') {
+    const dialogState = userStates.get(userId);
+    if (dialogState && dialogState.action === 'waiting_for_team_name') {
         if (text === '🔙 Отмена') {
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            const cancelMsg = await bot.sendMessage(chatId, '❌ Отменено.', getMainKeyboard(isAdminUser, !!currentTournament));
-            saveMessageId(chatId, cancelMsg.message_id);
+            bot.sendMessage(chatId, '❌ Отменено', getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
-        
         const teams = loadTeams();
         if (teams.includes(text)) {
-            const warnMsg = await bot.sendMessage(chatId, `⚠️ Команда "${text}" уже существует!`);
-            saveMessageId(chatId, warnMsg.message_id);
+            bot.sendMessage(chatId, `⚠️ "${text}" уже есть!`);
             return;
         }
-        
         teams.push(text);
         saveTeams(teams);
         userStates.delete(userId);
         const isAdminUser = await isAdmin(chatId, userId);
-        const successMsg = await bot.sendMessage(chatId, `✅ Команда "${text}" добавлена!`, getMainKeyboard(isAdminUser, !!currentTournament));
-        saveMessageId(chatId, successMsg.message_id);
+        bot.sendMessage(chatId, `✅ "${text}" добавлена!`, getMainKeyboard(isAdminUser, !!currentTournament));
         return;
     }
     
-    // Удаление команды
-    if (userDialogState && userDialogState.action === 'waiting_for_team_remove') {
+    if (dialogState && dialogState.action === 'waiting_for_team_remove') {
         if (text === '🔙 Отмена') {
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            const cancelMsg = await bot.sendMessage(chatId, '❌ Отменено.', getMainKeyboard(isAdminUser, !!currentTournament));
-            saveMessageId(chatId, cancelMsg.message_id);
+            bot.sendMessage(chatId, '❌ Отменено', getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
-        
         const teams = loadTeams();
-        const index = teams.indexOf(text);
-        
-        if (index === -1) {
-            const errorMsg = await bot.sendMessage(chatId, `❌ Команда "${text}" не найдена!`);
-            saveMessageId(chatId, errorMsg.message_id);
+        const idx = teams.indexOf(text);
+        if (idx === -1) {
+            bot.sendMessage(chatId, `❌ "${text}" не найдена!`);
             return;
         }
-        
-        teams.splice(index, 1);
+        teams.splice(idx, 1);
         saveTeams(teams);
         userStates.delete(userId);
         const isAdminUser = await isAdmin(chatId, userId);
-        const successMsg = await bot.sendMessage(chatId, `✅ Команда "${text}" удалена!`, getMainKeyboard(isAdminUser, !!currentTournament));
-        saveMessageId(chatId, successMsg.message_id);
+        bot.sendMessage(chatId, `✅ "${text}" удалена!`, getMainKeyboard(isAdminUser, !!currentTournament));
         return;
     }
     
-    // Главное меню
     const isAdminUser = await isAdmin(chatId, userId);
     
     switch (text) {
         case '🏆 Новый турнир':
             if (currentTournament) {
-                const warnMsg = await bot.sendMessage(chatId, '⚠️ Активный турнир уже идет!');
-                saveMessageId(chatId, warnMsg.message_id);
+                bot.sendMessage(chatId, '⚠️ Турнир уже идет!');
                 break;
             }
             tournamentMode.set(chatId, false);
-            const tournamentMsg = await bot.sendMessage(chatId, 
-                `👥 Выбери участников турнира (от 2 до 5 человек):\n\nРежим: ⚽ Клубный турнир\n\n(нажимай на имена для выбора)`,
+            const tMsg = await bot.sendMessage(chatId, 
+                `👥 Выбери участников (2-5):\n\nРежим: ⚽ Клубы`,
                 createTournamentSelectionKeyboard([], false)
             );
-            saveMessageId(chatId, tournamentMsg.message_id);
+            saveMessageId(chatId, tMsg.message_id);
             break;
             
         case '📋 Список команд':
             const teams = loadTeams();
-            const nationalTeams = loadNationalTeams();
-            
-            let teamList = '<b>⚽ КЛУБЫ:</b>\n\n';
-            if (teams.length === 0) {
-                teamList += 'Список пуст.\n';
-            } else {
-                teams.forEach((team, index) => {
-                    teamList += `${index + 1}. ${team}\n`;
-                });
-            }
-            
-            teamList += `\n<b>🌍 СБОРНЫЕ:</b>\n\n`;
-            if (nationalTeams.length === 0) {
-                teamList += 'Список пуст.\n';
-            } else {
-                nationalTeams.forEach((team, index) => {
-                    teamList += `${index + 1}. ${team}\n`;
-                });
-            }
-            
-            const listMsg = await bot.sendMessage(chatId, teamList, { parse_mode: 'HTML' });
-            saveMessageId(chatId, listMsg.message_id);
+            const nats = loadNationalTeams();
+            let list = '<b>⚽ КЛУБЫ:</b>\n\n';
+            teams.forEach((t, i) => { list += `${i + 1}. ${t}\n`; });
+            list += `\n<b>🌍 СБОРНЫЕ:</b>\n\n`;
+            nats.forEach((t, i) => { list += `${i + 1}. ${t}\n`; });
+            const lMsg = await bot.sendMessage(chatId, list, { parse_mode: 'HTML' });
+            saveMessageId(chatId, lMsg.message_id);
             break;
             
         case '📈 Общий рейтинг':
-            const ratingTable = getGlobalRatingTable();
-            const ratingMsg = await bot.sendMessage(chatId, ratingTable, { parse_mode: 'HTML' });
-            saveMessageId(chatId, ratingMsg.message_id);
+            const rMsg = await bot.sendMessage(chatId, getGlobalRatingTable(), { parse_mode: 'HTML' });
+            saveMessageId(chatId, rMsg.message_id);
+            break;
+            
+        case '⚔️ Личные встречи':
+            const hMsg = await bot.sendMessage(chatId, 
+                '⚔️ <b>ЛИЧНЫЕ ВСТРЕЧИ</b>\n\nВыбери первого игрока:', 
+                { parse_mode: 'HTML', ...createH2HFirstPlayerKeyboard() }
+            );
+            saveMessageId(chatId, hMsg.message_id);
             break;
             
         case '✏️ Записать результат':
             if (!currentTournament) {
-                const errorMsg = await bot.sendMessage(chatId, '❌ Нет активного турнира!');
-                saveMessageId(chatId, errorMsg.message_id);
+                bot.sendMessage(chatId, '❌ Нет турнира!');
                 break;
             }
-            const incompleteMatches = currentTournament.matches.filter(m => !m.completed);
-            if (incompleteMatches.length === 0) {
-                const completeMsg = await bot.sendMessage(chatId, '✅ Все матчи уже сыграны!');
-                saveMessageId(chatId, completeMsg.message_id);
+            if (currentTournament.matches.every(m => m.completed)) {
+                bot.sendMessage(chatId, '✅ Все матчи сыграны!');
                 break;
             }
-            const selectMatchMsg = await bot.sendMessage(chatId, '📝 Выбери матч:', 
-                createMatchSelectionKeyboard(currentTournament.matches));
-            saveMessageId(chatId, selectMatchMsg.message_id);
+            const mMsg = await bot.sendMessage(chatId, '📝 Выбери матч:', createMatchSelectionKeyboard(currentTournament.matches));
+            saveMessageId(chatId, mMsg.message_id);
             break;
             
         case '📊 Таблица':
             if (!currentTournament) {
-                const errorMsg = await bot.sendMessage(chatId, '❌ Нет активного турнира!');
-                saveMessageId(chatId, errorMsg.message_id);
+                bot.sendMessage(chatId, '❌ Нет турнира!');
                 break;
             }
             const stats = calculateStats(currentTournament.participants, currentTournament.matches);
-            const standings = getStandingsTable(stats);
-            const standingsMsg = await bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
-            saveMessageId(chatId, standingsMsg.message_id);
+            const stMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
+            saveMessageId(chatId, stMsg.message_id);
             break;
             
         case '✏️ Редактировать':
             if (!currentTournament) {
-                const errorMsg = await bot.sendMessage(chatId, '❌ Нет активного турнира!');
-                saveMessageId(chatId, errorMsg.message_id);
+                bot.sendMessage(chatId, '❌ Нет турнира!');
                 break;
             }
-            const completedMatches = currentTournament.matches.filter(m => m.completed);
-            if (completedMatches.length === 0) {
-                const noMatchesMsg = await bot.sendMessage(chatId, '❌ Нет завершенных матчей!');
-                saveMessageId(chatId, noMatchesMsg.message_id);
-                break;
-            }
-            const editKeyboard = createEditMatchSelectionKeyboard(currentTournament.matches);
-            if (editKeyboard) {
-                const editMsg = await bot.sendMessage(chatId, '✏️ Выбери матч:', editKeyboard);
-                saveMessageId(chatId, editMsg.message_id);
+            const ek = createEditMatchSelectionKeyboard(currentTournament.matches);
+            if (ek) {
+                const eMsg = await bot.sendMessage(chatId, '✏️ Выбери матч:', ek);
+                saveMessageId(chatId, eMsg.message_id);
             }
             break;
             
         case '🏆 Завершить':
-            if (!currentTournament) {
-                const errorMsg = await bot.sendMessage(chatId, '❌ Нет активного турнира!');
-                saveMessageId(chatId, errorMsg.message_id);
+            if (!currentTournament) { bot.sendMessage(chatId, '❌ Нет турнира!'); break; }
+            if (!currentTournament.matches.every(m => m.completed)) {
+                const rem = currentTournament.matches.filter(m => !m.completed).length;
+                bot.sendMessage(chatId, `⚠️ Осталось ${rem} матчей!`);
                 break;
             }
-            const allCompleted = currentTournament.matches.every(m => m.completed);
-            if (!allCompleted) {
-                const remaining = currentTournament.matches.filter(m => !m.completed).length;
-                const warnMsg = await bot.sendMessage(chatId, `⚠️ Не все матчи сыграны! Осталось ${remaining}.`);
-                saveMessageId(chatId, warnMsg.message_id);
-                break;
-            }
-            
             await deleteTournamentMessages();
             
-            const finalStats = calculateStats(currentTournament.participants, currentTournament.matches);
-            const sorted = [...finalStats].sort((a, b) => {
+            const fs_ = calculateStats(currentTournament.participants, currentTournament.matches);
+            const sorted = [...fs_].sort((a, b) => {
                 if (a.points !== b.points) return b.points - a.points;
-                const diffA = a.goalsFor - a.goalsAgainst;
-                const diffB = b.goalsFor - b.goalsAgainst;
-                return diffB - diffA;
+                const dA = a.goalsFor - a.goalsAgainst;
+                const dB = b.goalsFor - b.goalsAgainst;
+                return dB - dA;
             });
             const winner = sorted[0];
             
-            let finalMessage = `<b>🏆 ТУРНИР ЗАВЕРШЕН!</b>\n\n`;
-            finalMessage += `<b>ПОБЕДИТЕЛЬ:</b> ${winner.name} (${winner.team}) — ${winner.points} очков\n\n`;
-            finalMessage += `<b>ИТОГОВАЯ ТАБЛИЦА:</b>\n`;
-            sorted.forEach((s, idx) => {
-                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  ';
-                finalMessage += `${medal} ${s.name} (${s.team}) — ${s.points} очков (голы: ${s.goalsFor}:${s.goalsAgainst})\n`;
+            let fMsg = `<b>🏆 ТУРНИР ЗАВЕРШЕН!</b>\n\n<b>ПОБЕДИТЕЛЬ:</b> ${winner.name} (${winner.team}) — ${winner.points} очков\n\n<b>ИТОГОВАЯ ТАБЛИЦА:</b>\n`;
+            sorted.forEach((s, i) => {
+                const m = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
+                fMsg += `${m} ${s.name} (${s.team}) — ${s.points} (голы ${s.goalsFor}:${s.goalsAgainst})\n`;
             });
-            
-            finalMessage += `\n<b>📜 ВСЕ МАТЧИ:</b>\n`;
+            fMsg += `\n<b>📜 МАТЧИ:</b>\n`;
             currentTournament.matches.forEach(m => {
                 if (m.penalties) {
-                    finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2} — пен. поб. ${m.penalties}\n`;
+                    fMsg += `${m.player1} ${m.score1}:${m.score2} ${m.player2} — пен. ${m.penalties}\n`;
                 } else {
-                    finalMessage += `${m.player1} ${m.score1}:${m.score2} ${m.player2}\n`;
+                    fMsg += `${m.player1} ${m.score1}:${m.score2} ${m.player2}\n`;
                 }
             });
             
-            await bot.sendMessage(chatId, finalMessage, { parse_mode: 'HTML' });
-            
+            await bot.sendMessage(chatId, fMsg, { parse_mode: 'HTML' });
             currentTournament = null;
-            const endMsg = await bot.sendMessage(chatId, '✅ Турнир завершен!', getMainKeyboard(isAdminUser, false));
-            saveMessageId(chatId, endMsg.message_id);
+            const endM = await bot.sendMessage(chatId, '✅ Турнир завершен!', getMainKeyboard(isAdminUser, false));
+            saveMessageId(chatId, endM.message_id);
             break;
             
         case '⚠️ Прервать турнир':
-            if (!currentTournament) {
-                const errorMsg = await bot.sendMessage(chatId, '❌ Нет активного турнира!');
-                saveMessageId(chatId, errorMsg.message_id);
-                break;
-            }
-            
+            if (!currentTournament) { bot.sendMessage(chatId, '❌ Нет турнира!'); break; }
             await deleteTournamentMessages();
-            
             currentTournament = null;
-            const cancelMsg = await bot.sendMessage(chatId, '⚠️ Турнир прерван!', getMainKeyboard(isAdminUser, false));
-            saveMessageId(chatId, cancelMsg.message_id);
+            const cM = await bot.sendMessage(chatId, '⚠️ Турнир прерван!', getMainKeyboard(isAdminUser, false));
+            saveMessageId(chatId, cM.message_id);
             break;
             
         case '➕ Добавить команду':
-            if (!isAdminUser) {
-                const errorMsg = await bot.sendMessage(chatId, '⛔️ Только для админов!');
-                saveMessageId(chatId, errorMsg.message_id);
-                break;
-            }
-            const addMsg = await bot.sendMessage(chatId, '✏️ Введи название команды:\n\n(нажми "🔙 Отмена")',
-                { reply_markup: { keyboard: [['🔙 Отмена']], resize_keyboard: true } }
-            );
-            saveMessageId(chatId, addMsg.message_id);
+            if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+            const aM = await bot.sendMessage(chatId, '✏️ Название команды:', { reply_markup: { keyboard: [['🔙 Отмена']], resize_keyboard: true } });
+            saveMessageId(chatId, aM.message_id);
             userStates.set(userId, { action: 'waiting_for_team_name' });
             break;
             
         case '❌ Удалить команду':
-            if (!isAdminUser) {
-                const errorMsg = await bot.sendMessage(chatId, '⛔️ Только для админов!');
-                saveMessageId(chatId, errorMsg.message_id);
-                break;
-            }
-            const teamsList = loadTeams();
-            if (teamsList.length === 0) {
-                const emptyMsg = await bot.sendMessage(chatId, '📋 Список пуст.');
-                saveMessageId(chatId, emptyMsg.message_id);
-                break;
-            }
-            
-            const teamButtons = teamsList.map(team => [{ text: team }]);
-            teamButtons.push([{ text: '🔙 Отмена' }]);
-            
-            const deleteMsg = await bot.sendMessage(chatId, '❌ Выбери команду:', {
-                reply_markup: {
-                    keyboard: teamButtons,
-                    resize_keyboard: true
-                }
-            });
-            saveMessageId(chatId, deleteMsg.message_id);
+            if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+            const tList = loadTeams();
+            const btns = tList.map(t => [{ text: t }]);
+            btns.push([{ text: '🔙 Отмена' }]);
+            const dM = await bot.sendMessage(chatId, '❌ Выбери:', { reply_markup: { keyboard: btns, resize_keyboard: true } });
+            saveMessageId(chatId, dM.message_id);
             userStates.set(userId, { action: 'waiting_for_team_remove' });
             break;
             
         case '❓ Помощь':
-            const helpMessage = currentTournament ?
-                `<b>🎯 ТУРНИРНЫЙ РЕЖИМ (активен)</b>\n\n
-<b>✏️ Записать результат</b> — ввести счет матча\n
-<b>📊 Таблица</b> — турнирная таблица\n
-<b>✏️ Редактировать</b> — изменить результат\n
-<b>🏆 Завершить</b> — подвести итоги\n
-<b>⚠️ Прервать турнир</b> — отменить турнир\n\n
-<b>Система очков:</b>\n
-• Победа в основное время — 2 очка\n
-• Победа по пенальти — 2 очка победителю, 1 очко проигравшему\n
-• Ничья — 1 очко каждому` :
-                `<b>🎯 Турнирный бот</b>\n\n
-<b>Основные команды:</b>\n
-• 🏆 Новый турнир — создать турнир с жеребьевкой\n
-• 📋 Список команд — все клубы и сборные\n
-• 📈 Общий рейтинг — статистика всех игроков за всё время\n\n
-<b>Для админов:</b>\n
-• ➕ Добавить команду\n
-• ❌ Удалить команду\n\n
-<b>Режимы:</b>\n
-• ⚽ Клубный турнир\n
-• 🌍 ЧЕМПИОНАТ МИРА (сборные)`;
-            
-            const helpMsg = await bot.sendMessage(chatId, helpMessage, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
-            saveMessageId(chatId, helpMsg.message_id);
+            const help = currentTournament ?
+                `<b>🎯 ТУРНИР ИДЕТ</b>\n\n✏️ Записать — счет\n📊 Таблица\n✏️ Редактировать\n🏆 Завершить\n⚠️ Прервать` :
+                `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n\n<b>Для админов:</b>\n➕ Добавить команду\n❌ Удалить команду`;
+            const hM = await bot.sendMessage(chatId, help, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
+            saveMessageId(chatId, hM.message_id);
             break;
             
         case '🔙 Отмена':
             userStates.delete(userId);
-            const backMsg = await bot.sendMessage(chatId, '⬅️ Главное меню', getMainKeyboard(isAdminUser, !!currentTournament));
-            saveMessageId(chatId, backMsg.message_id);
-            break;
-
-        default:
-            if (text && !text.startsWith('/')) {}
+            bot.sendMessage(chatId, '⬅️ Главное меню', getMainKeyboard(isAdminUser, !!currentTournament));
             break;
     }
 });
 
-// Обработка callback для пенальти
 bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const userId = callbackQuery.from.id;
@@ -1098,16 +967,14 @@ bot.on('callback_query', async (callbackQuery) => {
     
     if (data.startsWith('penalty_')) {
         const winner = data.replace('penalty_', '');
-        
         const userState = userStates.get(userId);
         if (!userState || userState.action !== 'waiting_for_penalty') {
             await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Сессия истекла!' });
             return;
         }
-        
         const match = currentTournament.matches.find(m => m.id === userState.matchId);
         if (!match) {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч не найден!' });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Не найдено!' });
             return;
         }
         
@@ -1116,58 +983,41 @@ bot.on('callback_query', async (callbackQuery) => {
         match.penalties = winner;
         match.completed = true;
         
-        // Записываем в глобальную статистику
         recordMatchToGlobalStats(match, currentTournament.participants, currentTournament.type);
         
-        await bot.editMessageText(`✅ Результат записан!\n\n${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n⚽️ Ничья!\n🏆 Победа по пенальти: ${winner}`, {
-            chat_id: chatId,
-            message_id: callbackQuery.message.message_id
+        await bot.editMessageText(`✅ ${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n🏆 Пенальти: ${winner}`, {
+            chat_id: chatId, message_id: callbackQuery.message.message_id
         });
         
         const stats = calculateStats(currentTournament.participants, currentTournament.matches);
-        const standings = getStandingsTable(stats);
-        const liveStatus = getLiveStatus(currentTournament.matches);
-        
-        const standingsMsg = await bot.sendMessage(chatId, standings, { parse_mode: 'HTML' });
-        const statusMsg = await bot.sendMessage(chatId, liveStatus, { parse_mode: 'HTML' });
-        saveMessageId(chatId, standingsMsg.message_id);
-        saveMessageId(chatId, statusMsg.message_id);
+        const sMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
+        const lMsg = await bot.sendMessage(chatId, getLiveStatus(currentTournament.matches), { parse_mode: 'HTML' });
+        saveMessageId(chatId, sMsg.message_id);
+        saveMessageId(chatId, lMsg.message_id);
         
         userStates.delete(userId);
         
-        const allCompleted = currentTournament.matches.every(m => m.completed);
-        if (allCompleted) {
-            const completeMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить".');
-            saveMessageId(chatId, completeMsg.message_id);
+        if (currentTournament.matches.every(m => m.completed)) {
+            const cMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "Завершить".');
+            saveMessageId(chatId, cMsg.message_id);
         }
         
         await bot.answerCallbackQuery(callbackQuery.id);
     }
 });
 
-// Обработка команды /list_teams
 bot.onText(/\/list_teams/, async (msg) => {
     const chatId = msg.chat.id;
     const teams = loadTeams();
-    const nationalTeams = loadNationalTeams();
-    
-    let teamList = '<b>⚽ КЛУБЫ:</b>\n\n';
-    teams.forEach((team, index) => {
-        teamList += `${index + 1}. ${team}\n`;
-    });
-    
-    teamList += `\n<b>🌍 СБОРНЫЕ:</b>\n\n`;
-    nationalTeams.forEach((team, index) => {
-        teamList += `${index + 1}. ${team}\n`;
-    });
-    
-    const listMsg = await bot.sendMessage(chatId, teamList, { parse_mode: 'HTML' });
-    saveMessageId(chatId, listMsg.message_id);
+    const nats = loadNationalTeams();
+    let list = '<b>⚽ КЛУБЫ:</b>\n\n';
+    teams.forEach((t, i) => { list += `${i + 1}. ${t}\n`; });
+    list += `\n<b>🌍 СБОРНЫЕ:</b>\n\n`;
+    nats.forEach((t, i) => { list += `${i + 1}. ${t}\n`; });
+    const m = await bot.sendMessage(chatId, list, { parse_mode: 'HTML' });
+    saveMessageId(chatId, m.message_id);
 });
 
-// Обработка ошибок
-bot.on('polling_error', (error) => {
-    console.error('Polling error:', error);
-});
+bot.on('polling_error', (error) => { console.error('Polling error:', error); });
 
 console.log('🤖 Бот запущен!');
