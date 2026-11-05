@@ -51,4 +51,19 @@
     
     toggleControls();
     window.addEventListener('resize', toggleControls);
+
+        // Принудительно скроллим в начало при загрузке
+    // (иначе браузер может прыгнуть к последним слайдам)
+    carousel.scrollLeft = 0;
+    
+    // На случай, если браузер восстанавливает позицию скролла
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+    
+    // Дополнительная страховка после загрузки всех ресурсов
+    window.addEventListener('load', () => {
+        carousel.scrollLeft = 0;
+        updateButtons();
+    });
 })();
