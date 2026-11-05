@@ -877,7 +877,8 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     ];
     
     if (isAdminUser) {
-        keyboard.push([{ text: '➕ Добавить команду' }, { text: '❌ Удалить команду' }]);
+        keyboard.push([{ text: '➕ Добавить клуб' }, { text: '➕ Добавить сборную' }]);
+        keyboard.push([{ text: '❌ Удалить клуб' }, { text: '❌ Удалить сборную' }]);
         keyboard.push([{ text: '⚙️ Настройки' }]);
     }
     
@@ -1547,7 +1548,7 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        if (state && state.action === 'waiting_for_team_name') {
+        if (state && state.action === 'waiting_for_club_name') {
             if (text === '🔙 Отмена') {
                 userStates.delete(userId);
                 const isAdminUser = await isAdmin(chatId, userId);
@@ -1557,15 +1558,26 @@ bot.on('message', async (msg) => {
             const success = await db.addClub(chatId, text);
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            if (success) {
-                bot.sendMessage(chatId, `✅ "${text}" добавлена!`, getMainKeyboard(isAdminUser, !!currentTournament));
-            } else {
-                bot.sendMessage(chatId, `⚠️ "${text}" уже есть!`, getMainKeyboard(isAdminUser, !!currentTournament));
-            }
+            bot.sendMessage(chatId, success ? `✅ Клуб "${text}" добавлен!` : `⚠️ Клуб "${text}" уже есть!`, getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
         
-        if (state && state.action === 'waiting_for_team_remove') {
+        if (state && state.action === 'waiting_for_national_name') {
+            if (text === '🔙 Отмена') {
+                userStates.delete(userId);
+                const isAdminUser = await isAdmin(chatId, userId);
+                bot.sendMessage(chatId, '❌ Отменено', getMainKeyboard(isAdminUser, !!currentTournament));
+                return;
+            }
+            // Используем db.setNationalTeams — нужно добавить функцию addNationalTeam в db.js
+            const success = await db.addNationalTeam(chatId, text);
+            userStates.delete(userId);
+            const isAdminUser = await isAdmin(chatId, userId);
+            bot.sendMessage(chatId, success ? `✅ Сборная "${text}" добавлена!` : `⚠️ Сборная "${text}" уже есть!`, getMainKeyboard(isAdminUser, !!currentTournament));
+            return;
+        }
+        
+        if (state && state.action === 'waiting_for_club_remove') {
             if (text === '🔙 Отмена') {
                 userStates.delete(userId);
                 const isAdminUser = await isAdmin(chatId, userId);
@@ -1575,11 +1587,21 @@ bot.on('message', async (msg) => {
             const success = await db.removeClub(chatId, text);
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            if (success) {
-                bot.sendMessage(chatId, `✅ "${text}" удалена!`, getMainKeyboard(isAdminUser, !!currentTournament));
-            } else {
-                bot.sendMessage(chatId, `❌ "${text}" не найдена!`, getMainKeyboard(isAdminUser, !!currentTournament));
+            bot.sendMessage(chatId, success ? `✅ Клуб "${text}" удалён!` : `❌ Клуб "${text}" не найден!`, getMainKeyboard(isAdminUser, !!currentTournament));
+            return;
+        }
+        
+        if (state && state.action === 'waiting_for_national_remove') {
+            if (text === '🔙 Отмена') {
+                userStates.delete(userId);
+                const isAdminUser = await isAdmin(chatId, userId);
+                bot.sendMessage(chatId, '❌ Отменено', getMainKeyboard(isAdminUser, !!currentTournament));
+                return;
             }
+            const success = await db.removeNationalTeam(chatId, text);
+            userStates.delete(userId);
+            const isAdminUser = await isAdmin(chatId, userId);
+            bot.sendMessage(chatId, success ? `✅ Сборная "${text}" удалена!` : `❌ Сборная "${text}" не найдена!`, getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
         
@@ -1735,22 +1757,41 @@ bot.on('message', async (msg) => {
                 saveMessageId(chatId, cM.message_id);
                 break;
                 
-            case '➕ Добавить команду':
-                if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
-                const aM = await bot.sendMessage(chatId, '✏️ Название команды:', { reply_markup: { keyboard: [['🔙 Отмена']], resize_keyboard: true } });
-                saveMessageId(chatId, aM.message_id);
-                userStates.set(userId, { action: 'waiting_for_team_name' });
-                break;
+                case '➕ Добавить клуб':
+                    if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+                    const addClubMsg = await bot.sendMessage(chatId, '✏️ Название клуба:', { reply_markup: { keyboard: [['🔙 Отмена']], resize_keyboard: true } });
+                    saveMessageId(chatId, addClubMsg.message_id);
+                    userStates.set(userId, { action: 'waiting_for_club_name' });
+                    break;
                 
-            case '❌ Удалить команду':
-                if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
-                const tList = await db.getClubs(chatId);
-                const btns = tList.map(t => [{ text: t }]);
-                btns.push([{ text: '🔙 Отмена' }]);
-                const dM = await bot.sendMessage(chatId, '❌ Выбери:', { reply_markup: { keyboard: btns, resize_keyboard: true } });
-                saveMessageId(chatId, dM.message_id);
-                userStates.set(userId, { action: 'waiting_for_team_remove' });
-                break;
+                case '➕ Добавить сборную':
+                    if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+                    const addNatMsg = await bot.sendMessage(chatId, '✏️ Название сборной:', { reply_markup: { keyboard: [['🔙 Отмена']], resize_keyboard: true } });
+                    saveMessageId(chatId, addNatMsg.message_id);
+                    userStates.set(userId, { action: 'waiting_for_national_name' });
+                    break;
+                
+                case '❌ Удалить клуб':
+                    if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+                    const clubList = await db.getClubs(chatId);
+                    if (clubList.length === 0) { bot.sendMessage(chatId, '📋 Список клубов пуст.'); break; }
+                    const clubBtns = clubList.map(t => [{ text: t }]);
+                    clubBtns.push([{ text: '🔙 Отмена' }]);
+                    const delClubMsg = await bot.sendMessage(chatId, '❌ Выбери клуб:', { reply_markup: { keyboard: clubBtns, resize_keyboard: true } });
+                    saveMessageId(chatId, delClubMsg.message_id);
+                    userStates.set(userId, { action: 'waiting_for_club_remove' });
+                    break;
+                
+                case '❌ Удалить сборную':
+                    if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
+                    const natList = await db.getNationalTeams(chatId);
+                    if (natList.length === 0) { bot.sendMessage(chatId, '📋 Список сборных пуст.'); break; }
+                    const natBtns = natList.map(t => [{ text: t }]);
+                    natBtns.push([{ text: '🔙 Отмена' }]);
+                    const delNatMsg = await bot.sendMessage(chatId, '❌ Выбери сборную:', { reply_markup: { keyboard: natBtns, resize_keyboard: true } });
+                    saveMessageId(chatId, delNatMsg.message_id);
+                    userStates.set(userId, { action: 'waiting_for_national_remove' });
+                    break;
                 
             case '⚙️ Настройки':
                 if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
