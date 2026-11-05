@@ -394,6 +394,54 @@ h3 {
     color: var(--accent);
 }
 
+/* Клавиатура бота (reply keyboard, как в Telegram iOS) */
+.bot-keyboard {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 6px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(20, 25, 38, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bot-keyboard-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.bot-keyboard-btn {
+    padding: 10px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bot-keyboard-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.bot-keyboard-btn:active {
+    background: rgba(34, 211, 238, 0.2);
+    transform: scale(0.98);
+}
+
 /* ============================================================
    HOW
    ============================================================ */
