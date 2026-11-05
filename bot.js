@@ -39,7 +39,7 @@ const tournamentMode = new Map();
 let currentTournament = null;
 let tournamentMessages = [];
 
-// Дефолтные списки (загружаются один раз при старте)
+// Дефолтные списки
 let DEFAULT_CLUBS = [];
 let DEFAULT_NATIONAL_TEAMS = [];
 
@@ -59,7 +59,6 @@ async function getLimits(chatId) {
 
 async function initializeBot() {
     try {
-        // Загружаем дефолтные списки из JSON
         try {
             const teamsFile = path.join(__dirname, 'teams.json');
             if (fs.existsSync(teamsFile)) {
@@ -120,7 +119,6 @@ async function deleteTournamentMessages() {
     tournamentMessages = [];
 }
 
-// Генерация уникального participant_id из имени
 function generateParticipantId(name, existingIds = []) {
     let base = name.toLowerCase()
         .replace(/[^a-zа-яё0-9]/gi, '')
@@ -164,9 +162,7 @@ async function startOnboarding(chatId, userId) {
     );
 }
 
-// Продолжение онбординга после выбора количества
 async function continueOnboarding(chatId, userId, count) {
-    // Проверка лимита
     const limits = await getLimits(chatId);
     if (count > limits.maxParticipants) {
         await bot.sendMessage(chatId,
@@ -195,12 +191,10 @@ async function continueOnboarding(chatId, userId, count) {
     );
 }
 
-// Обработка ввода имени во время онбординга
 async function handleOnboardingInput(chatId, userId, text) {
     const state = userStates.get(userId);
     if (!state || state.action !== 'onboarding') return false;
     
-    // Парсим "Имя @username"
     const parts = text.trim().split(/\s+/);
     const name = parts[0];
     const username = parts[1] ? parts[1].replace('@', '') : null;
@@ -210,7 +204,6 @@ async function handleOnboardingInput(chatId, userId, text) {
         return true;
     }
     
-    // Генерируем ID
     const existingIds = state.participants.map(p => p.id);
     const participantId = generateParticipantId(name, existingIds);
     
@@ -218,23 +211,19 @@ async function handleOnboardingInput(chatId, userId, text) {
     state.current++;
     
     if (state.current > state.count) {
-        // Все собраны — сохраняем в БД
         for (const p of state.participants) {
             await db.addParticipant(chatId, p.id, p.name, p.username);
         }
         
-        // Копируем дефолтные команды
         await db.setClubs(chatId, DEFAULT_CLUBS);
         await db.setNationalTeams(chatId, DEFAULT_NATIONAL_TEAMS);
         
-        // Создаём подписку (free)
         try {
             await db.setSubscription(chatId, 'free');
         } catch (e) {}
         
         userStates.delete(userId);
         
-        // Показываем результат
         let list = '✅ <b>Настройка завершена!</b>\n\n<b>Участники:</b>\n';
         state.participants.forEach((p, i) => {
             list += `${i + 1}. ${p.name}${p.username ? ` (@${p.username})` : ''}\n`;
@@ -256,7 +245,6 @@ async function handleOnboardingInput(chatId, userId, text) {
         return true;
     }
     
-    // Запрос следующего участника
     await bot.sendMessage(chatId,
         `👤 <b>Участник ${state.current} из ${state.count}</b>\n\n` +
         `Введи имя (можно с @username):`,
@@ -687,7 +675,8 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     const keyboard = [
         [{ text: '🏆 Новый турнир' }, { text: '📋 Список команд' }],
         [{ text: '📈 Общий рейтинг' }, { text: '⚔️ Личные встречи' }],
-        [{ text: '🏟️ Статистика команд' }, { text: '❓ Помощь' }]
+        [{ text: '🏟️ Статистика команд' }, { text: '💎 PRO' }],
+        [{ text: '❓ Помощь' }]
     ];
     
     if (isAdminUser) {
@@ -763,14 +752,68 @@ function createH2HSecondPlayerKeyboard(participants, firstPlayerName) {
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
-// ============ ОБРАБОТЧИКИ ============
+// ============ PREMIUM UI ============
+
+async function showPremiumMessage(chatId, messageId = null) {
+    const sub = await db.getSubscription(chatId);
+    const limits = await getLimits(chatId);
+    const tourCount = await db.getTournamentCount(chatId);
+    const isPro = sub.tier === 'pro';
+    
+    let text, keyboard;
+    
+    if (isPro) {
+        text = `💎 <b>PRO-версия активна</b>\n\n` +
+            `✅ Безлимит турниров\n` +
+            `✅ До 10 участников\n` +
+            `✅ Все будущие фичи\n\n` +
+            `📊 <b>Ваша статистика:</b>\n` +
+            `• Турниров создано: ${tourCount}\n` +
+            `• Максимум участников: ${limits.maxParticipants}\n\n` +
+            `Спасибо за поддержку! 🙏`;
+        keyboard = {
+            inline_keyboard: [
+                [{ text: '📊 Общий рейтинг', callback_data: 'premium_show_rating' }]
+            ]
+        };
+    } else {
+        const remaining = Math.max(0, limits.maxTournaments - tourCount);
+        text = `💎 <b>PRO-версия</b> (200₽, навсегда)\n\n` +
+            `<b>Что даёт:</b>\n` +
+            `✅ До <b>10 участников</b> (сейчас: ${limits.maxParticipants})\n` +
+            `✅ <b>Безлимит турниров</b> (сейчас: ${remaining} из ${limits.maxTournaments})\n` +
+            `✅ Все будущие фичи\n\n` +
+            `<b>📊 Ваша статистика:</b>\n` +
+            `• Турниров создано: ${tourCount} из ${limits.maxTournaments}\n` +
+            `• Максимум участников: ${limits.maxParticipants}\n\n` +
+            `<i>Оплата разовая — платите 200₽ и пользуетесь навсегда.</i>`;
+        keyboard = {
+            inline_keyboard: [
+                [{ text: '💳 Купить PRO за 200₽', callback_data: 'premium_buy' }],
+                [{ text: '❓ Что входит в PRO?', callback_data: 'premium_info' }]
+            ]
+        };
+    }
+    
+    if (messageId) {
+        await bot.editMessageText(text, {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'HTML',
+            reply_markup: keyboard
+        });
+    } else {
+        await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    }
+}
+
+// ============ КОМАНДЫ ============
 
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     
     try {
-        // Проверяем онбординг
         const hasParts = await db.hasParticipants(chatId);
         if (!hasParts) {
             await startOnboarding(chatId, userId);
@@ -787,12 +830,10 @@ bot.onText(/\/start/, async (msg) => {
     }
 });
 
-// Команда /chatid (для отладки)
 bot.onText(/\/chatid/, (msg) => {
     bot.sendMessage(msg.chat.id, `Chat ID: \`${msg.chat.id}\``, { parse_mode: 'Markdown' });
 });
 
-// Команда /setup — перенастроить участников
 bot.onText(/\/setup/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -807,7 +848,6 @@ bot.onText(/\/setup/, async (msg) => {
     await startOnboarding(chatId, userId);
 });
 
-// Команда /reset — сбросить данные
 bot.onText(/\/reset/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -838,6 +878,15 @@ bot.onText(/\/reset/, async (msg) => {
     );
 });
 
+bot.onText(/\/premium/, async (msg) => {
+    try {
+        await showPremiumMessage(msg.chat.id);
+    } catch (error) {
+        console.error('Premium error:', error);
+        bot.sendMessage(msg.chat.id, '❌ Ошибка, попробуй позже');
+    }
+});
+
 // ============ CALLBACK QUERIES ============
 
 bot.on('callback_query', async (callbackQuery) => {
@@ -861,11 +910,6 @@ bot.on('callback_query', async (callbackQuery) => {
             await db.clearParticipants(chatId);
             await db.setClubs(chatId, []);
             await db.setNationalTeams(chatId, []);
-            await bot.query('DELETE FROM matches WHERE chat_id = $1', [chatId]).catch(() => {});
-            // Проще через прямой SQL
-            const { Pool } = require('pg');
-            // Используем pool из db (не экспортирован, но можно через отдельный запрос)
-            // Проще: пересоздадим через db функции
             await bot.editMessageText('✅ Все данные удалены. Напиши /start для новой настройки.', {
                 chat_id: chatId,
                 message_id: messageId
@@ -876,6 +920,77 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data === 'reset_cancel') {
             await bot.editMessageText('❌ Отменено', { chat_id: chatId, message_id: messageId });
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        // PREMIUM
+        if (data === 'premium_buy') {
+            await bot.editMessageText(
+                `💳 <b>Оплата PRO-версии</b>\n\n` +
+                `Сумма: <b>200₽</b>\n` +
+                `Способ оплаты: <b>СБП / Карта</b>\n\n` +
+                `<i>⏳ Функция оплаты в разработке.\n` +
+                `Скоро здесь появится кнопка «Оплатить» через ЮKassa.</i>\n\n` +
+                `А пока — напишите админу бота: @antsn21`,
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '◀️ Назад', callback_data: 'premium_back' }]
+                        ]
+                    }
+                }
+            );
+            await bot.answerCallbackQuery(callbackQuery.id, { text: '⏳ Скоро!' });
+            return;
+        }
+        
+        if (data === 'premium_info') {
+            await bot.editMessageText(
+                `💎 <b>Что входит в PRO-версию</b>\n\n` +
+                `<b>Сейчас (FREE):</b>\n` +
+                `• Максимум 4 участника\n` +
+                `• Максимум 5 турниров\n\n` +
+                `<b>С PRO (200₽, навсегда):</b>\n` +
+                `• До 10 участников\n` +
+                `• Безлимит турниров\n` +
+                `• Все будущие фичи\n` +
+                `• Приоритетная поддержка\n\n` +
+                `<b>❓ Частые вопросы:</b>\n\n` +
+                `<b>Это подписка?</b>\n` +
+                `Нет, разовый платёж. Платите 200₽ один раз — пользуетесь навсегда.\n\n` +
+                `<b>PRO для одного чата или для всех?</b>\n` +
+                `Для одного чата. Если создадите новый чат — там будет FREE.\n\n` +
+                `<b>Как оплатить?</b>\n` +
+                `Скоро появится оплата через СБП/карту (ЮKassa).`,
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '💳 Купить PRO', callback_data: 'premium_buy' }],
+                            [{ text: '◀️ Назад', callback_data: 'premium_back' }]
+                        ]
+                    }
+                }
+            );
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        if (data === 'premium_back') {
+            await showPremiumMessage(chatId, messageId);
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        if (data === 'premium_show_rating') {
+            const ratingTable = await getGlobalRatingTable(chatId);
+            await bot.sendMessage(chatId, ratingTable, { parse_mode: 'HTML' });
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
@@ -991,7 +1106,6 @@ bot.on('callback_query', async (callbackQuery) => {
                 return;
             }
             
-            // Проверка лимита турниров
             const limits = await getLimits(chatId);
             const tourCount = await db.getTournamentCount(chatId);
             if (tourCount >= limits.maxTournaments) {
@@ -1139,14 +1253,12 @@ bot.on('message', async (msg) => {
     if (!text) return;
     
     try {
-        // Онбординг
         const state = userStates.get(userId);
         if (state && state.action === 'onboarding') {
             await handleOnboardingInput(chatId, userId, text);
             return;
         }
         
-        // Ввод счета
         if (state && (state.action === 'waiting_for_score' || state.action === 'editing_score')) {
             const match = /^(\d+)[:\s\-](\d+)$/.exec(text);
             if (!match) {
@@ -1197,7 +1309,6 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        // Добавление команды
         if (state && state.action === 'waiting_for_team_name') {
             if (text === '🔙 Отмена') {
                 userStates.delete(userId);
@@ -1284,6 +1395,10 @@ bot.on('message', async (msg) => {
                 const teamStats = await formatTeamStats(chatId);
                 const tsMsg = await bot.sendMessage(chatId, teamStats, { parse_mode: 'HTML' });
                 saveMessageId(chatId, tsMsg.message_id);
+                break;
+                
+            case '💎 PRO':
+                await showPremiumMessage(chatId);
                 break;
                 
             case '✏️ Записать результат':
@@ -1401,7 +1516,7 @@ bot.on('message', async (msg) => {
             case '❓ Помощь':
                 const help = currentTournament ?
                     `<b>🎯 ТУРНИР ИДЕТ</b>\n\n✏️ Записать — счет\n📊 Таблица\n✏️ Редактировать\n🏆 Завершить\n⚠️ Прервать` :
-                    `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n🏟️ Статистика команд\n\n<b>Для админов:</b>\n⚙️ Настройки`;
+                    `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n🏟️ Статистика команд\n💎 PRO\n\n<b>Для админов:</b>\n⚙️ Настройки`;
                 const hM = await bot.sendMessage(chatId, help, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
                 saveMessageId(chatId, hM.message_id);
                 break;
