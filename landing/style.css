@@ -528,9 +528,14 @@ h3 {
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    /* Скрываем скроллбар во всех браузерах */
-    scrollbar-width: none;        /* Firefox */
-    -ms-overflow-style: none;     /* IE/Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    cursor: grab;
+    user-select: none; /* чтобы текст не выделялся при drag */
+}
+
+.examples-carousel:active {
+    cursor: grabbing;
 }
 
 .examples-carousel::-webkit-scrollbar {
@@ -539,7 +544,7 @@ h3 {
 
 .examples-track {
     display: flex;
-    gap: 24px;
+    gap: 64px;
     /* Выравнивание по контейнеру слева и справа */
     padding-left: max(24px, calc((100vw - 1180px) / 2));
     padding-right: max(24px, calc((100vw - 1180px) / 2));
