@@ -3,29 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Турнирный бот для FIFA — турниры без споров</title>
-    <meta name="description" content="Telegram-бот для организации турниров по FIFA. Автоматическая жеребьёвка, расписание, подсчёт очков, статистика и ачивки.">
+    <title>Турниры по FIFA без споров и Excel — Telegram-бот</title>
+    <meta name="description" content="Telegram-бот для турниров по FIFA. Жеребьёвка, расписание, подсчёт очков, статистика и ачивки — автоматически. Начните бесплатно.">
+    <meta name="keywords" content="FIFA, FC26, турниры, Telegram бот, футбол, киберспорт, таблица">
+    <meta property="og:title" content="Турниры по FIFA без споров и Excel">
+    <meta property="og:description" content="Добавьте бота в чат — и через 2 минуты начнёте турнир. Всё автоматически.">
+    <meta property="og:type" content="website">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>">
 </head>
 <body>
 
-<!-- Hero -->
+<!-- HERO -->
 <header class="hero">
     <div class="container">
         <div class="hero-content">
-            <div class="badge">⚽ Турниры по FIFA</div>
-            <h1>Турниры без <span class="highlight">споров</span> и Excel</h1>
+            <div class="badge">
+                <span class="badge-dot"></span>
+                Работает в Telegram
+            </div>
+            <h1>Турниры по FIFA<br>без <span class="highlight">споров</span> и Excel</h1>
             <p class="hero-subtitle">
-                Telegram-бот, который сам распределяет команды, составляет расписание,
-                считает очки и ведёт статистику. Просто добавь в чат — и играйте.
+                Добавьте бота в чат — и через две минуты начнёте турнир.
+                Жеребьёвка, расписание, подсчёт очков и статистика — всё автоматически.
             </p>
             <div class="hero-buttons">
-                <a href="https://t.me/ВАШ_БОТ" class="btn btn-primary" target="_blank">
-                    🚀 Добавить в Telegram
+                <a href="https://t.me/fc26avangard_bot" class="btn btn-primary" target="_blank" rel="noopener">
+                    Открыть в Telegram
+                    <span class="btn-arrow">→</span>
                 </a>
-                <a href="#features" class="btn btn-secondary">
-                    Узнать больше
+                <a href="#features" class="btn btn-ghost">
+                    Как это работает
                 </a>
             </div>
             <div class="hero-stats">
@@ -38,25 +46,48 @@
                     <div class="stat-label">сборных</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-number">∞</div>
-                    <div class="stat-label">матчей</div>
+                    <div class="stat-number">2 мин</div>
+                    <div class="stat-label">до старта</div>
                 </div>
             </div>
         </div>
         <div class="hero-image">
-            <div class="phone-mockup">
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
                 <div class="phone-screen">
-                    <div class="chat-message bot">
-                        <div class="bot-name">⚽ Турнирный бот</div>
-                        <div class="message-text">
-                            <strong>🎲 Жеребьёвка команд:</strong><br><br>
-                            Владимир → 🇪🇸 Реал Мадрид<br>
-                            Нуриман → 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>
-                            Никита → 🇩🇪 Бавария<br><br>
-                            <strong>🏆 РАСПИСАНИЕ:</strong><br><br>
-                            Владимир vs Нуриман<br>
-                            Владимир vs Никита<br>
-                            Нуриман vs Никита
+                    <div class="chat-header">
+                        <div class="chat-avatar">⚽</div>
+                        <div class="chat-info">
+                            <div class="chat-name">Турнирный бот</div>
+                            <div class="chat-status">онлайн</div>
+                        </div>
+                    </div>
+                    <div class="chat-body">
+                        <div class="msg bot">
+                            <div class="msg-name">🎲 Жеребьёвка команд</div>
+                            <div class="msg-text">
+                                Владимир → 🇪🇸 Реал Мадрид<br>
+                                Нуриман → 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>
+                                Никита → 🇩🇪 Бавария
+                            </div>
+                        </div>
+                        <div class="msg bot">
+                            <div class="msg-name">🏆 Расписание</div>
+                            <div class="msg-text">
+                                Владимир vs Нуриман<br>
+                                Владимир vs Никита<br>
+                                Нуриман vs Никита
+                            </div>
+                        </div>
+                        <div class="msg user">
+                            <div class="msg-text">3:1</div>
+                        </div>
+                        <div class="msg bot">
+                            <div class="msg-name">✅ Результат записан</div>
+                            <div class="msg-text">
+                                Владимир <strong>3:1</strong> Нуриман<br>
+                                Победа в основное время
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -65,139 +96,283 @@
     </div>
 </header>
 
-<!-- Features -->
+<!-- ПРОБЛЕМА -->
+<section class="problem">
+    <div class="container">
+        <div class="problem-header">
+            <span class="eyebrow">Знакомо?</span>
+            <h2>Каждый турнир заканчивается одинаково</h2>
+        </div>
+        <div class="problem-grid">
+            <div class="problem-item">
+                <span class="problem-icon">📝</span>
+                <p>Очки считаете на бумажке или в заметках. Где-то теряете, где-то путаетесь.</p>
+            </div>
+            <div class="problem-item">
+                <span class="problem-icon">😤</span>
+                <p>Начинаете спорить, кто победил: «у меня больше побед» / «а у меня разница голов».</p>
+            </div>
+            <div class="problem-item">
+                <span class="problem-icon">🥅</span>
+                <p>Не помните, кто выиграл по пенальти в прошлом туре. А это было важно.</p>
+            </div>
+            <div class="problem-item">
+                <span class="problem-icon">🤔</span>
+                <p>Каждый раз заново договариваетесь, какие команды брать и как распределять.</p>
+            </div>
+        </div>
+        <p class="problem-resolve">
+            Бот берёт всё это на себя. Вы просто играете.
+        </p>
+    </div>
+</section>
+
+<!-- КАК РАБОТАЕТ -->
+<section class="how">
+    <div class="container">
+        <div class="section-header">
+            <span class="eyebrow">Как это работает</span>
+            <h2>Три шага до первого матча</h2>
+        </div>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">01</div>
+                <h3>Добавьте бота в чат</h3>
+                <p>Откройте Telegram, добавьте бота в групповой чат с друзьями. Сделайте его администратором — иначе он не увидит сообщения.</p>
+            </div>
+            <div class="step">
+                <div class="step-num">02</div>
+                <h3>Настройте участников</h3>
+                <p>Напишите <code>/start</code>. Бот спросит количество игроков и имена. Займёт две минуты.</p>
+            </div>
+            <div class="step">
+                <div class="step-num">03</div>
+                <h3>Играйте</h3>
+                <p>Жмите «🏆 Новый турнир». Бот распределит команды и составит расписание. Дальше — только футбол.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ФИЧИ -->
 <section id="features" class="features">
     <div class="container">
-        <h2>Что умеет бот</h2>
-        <p class="section-subtitle">Всё, чтобы забыть про ручной подсчёт очков</p>
+        <div class="section-header">
+            <span class="eyebrow">Возможности</span>
+            <h2>Всё, чтобы забыть про ручной подсчёт</h2>
+        </div>
         
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">🎲</div>
                 <h3>Жеребьёвка команд</h3>
-                <p>Случайное распределение 43 клубов и 10 сборных. Никаких «я всегда за Реал».</p>
+                <p>Случайное распределение 43 клубов и 10 сборных. Никаких «я всегда за Реал» — команды достаются честно.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">📅</div>
                 <h3>Расписание матчей</h3>
-                <p>Турнир «каждый с каждым» — автоматически. От 2 до 10 участников.</p>
+                <p>Турнир «каждый с каждым» генерируется автоматически. От 2 до 10 участников.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">⚽️</div>
-                <h3>Запись счёта</h3>
-                <p>Введи счёт прямо в чат: <code>2:1</code>, <code>2 1</code> или <code>2-1</code>.</p>
+                <h3>Ввод счёта</h3>
+                <p>Пишите счёт прямо в чат — <code>2:1</code>, <code>2 1</code> или <code>2-1</code>. Работает любой формат.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">🥅</div>
                 <h3>Ничья и пенальти</h3>
-                <p>Если основное время вничью — бот спросит, кто победил по пенальти.</p>
+                <p>Если основное время вничью — бот спросит, кто победил по пенальти. Победителю — 2 очка, проигравшему — 1.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">📊</div>
                 <h3>Live-таблица</h3>
-                <p>Таблица обновляется после каждого матча. Всегда видно, кто лидер.</p>
+                <p>Обновляется после каждого матча. Сортировка по очкам, затем по разнице голов, затем по забитым.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">✏️</div>
+                <h3>Редактирование</h3>
+                <p>Ошиблись при вводе? Нажмите «Редактировать» — бот пересчитает всю статистику автоматически.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🏆</div>
+                <h3>Два режима</h3>
+                <p>Клубный турнир — Реал, Бавария, Ман Сити. Или чемпионат мира — Аргентина, Франция, Бразилия.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">📈</div>
                 <h3>Общий рейтинг</h3>
-                <p>Статистика за всё время: очки, победы, голы, турниры.</p>
+                <p>Статистика за всё время: очки, победы, поражения, голы, турниры. Кто настоящий GOAT?</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">⚔️</div>
                 <h3>Личные встречи</h3>
-                <p>«Сколько раз я тебя уже бил?» — бот знает всё.</p>
+                <p>Сколько раз вы уже играли с этим другом? С каким счётом? Бот помнит всё — включая последние пять матчей.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">👤</div>
                 <h3>Профиль игрока</h3>
-                <p>Полная статистика + достижения. Смотри, кто настоящий GOAT.</p>
+                <p>Место в рейтинге, винрейт, серия побед и достижения — всё в одном сообщении.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">🏅</div>
-                <h3>Ачивки</h3>
-                <p>🔥 Серия, 💯 Ветеран, 🎯 Идеальный пенальтист — собирай бейджи.</p>
+                <h3>Достижения</h3>
+                <p>🔥 Серия — 5 побед подряд. 💯 Ветеран — 50 матчей. 🎯 Идеальный пенальтист — 5+ побед без поражений.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">➕</div>
+                <h3>Свои команды</h3>
+                <p>Админ может добавить или удалить команду из списка. Хотите «Спартак»? Добавьте за 10 секунд.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🏟️</div>
+                <h3>Статистика команд</h3>
+                <p>Какие клубы чаще выигрывают? Какие сборные — фартовые? Отдельно по клубам и сборным.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚠️</div>
+                <h3>Прервать турнир</h3>
+                <p>Передумали играть? Нажмите «Прервать» — турнир отменится без сохранения результатов.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Приватность</h3>
+                <p>Каждый чат — своя база данных. Ваши результаты не видят другие компании. Полная изоляция.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡️</div>
+                <h3>Онбординг за 2 минуты</h3>
+                <p>Не нужно читать инструкции. Напишите <code>/start</code> — и бот сам всё спросит.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- How it works -->
-<section class="how-it-works">
+<!-- ПРИМЕРЫ -->
+<section class="examples">
     <div class="container">
-        <h2>Как начать</h2>
-        <p class="section-subtitle">3 шага — и вы в игре</p>
+        <div class="section-header">
+            <span class="eyebrow">Из чата</span>
+            <h2>Как это выглядит вживую</h2>
+        </div>
         
-        <div class="steps">
-            <div class="step">
-                <div class="step-number">1</div>
-                <h3>Добавь бота в чат</h3>
-                <p>Открой Telegram, добавь бота в групповой чат с друзьями. Сделай его админом.</p>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-label">Жеребьёвка</div>
+                <div class="example-body">
+                    <div class="msg bot">
+                        <div class="msg-name">🎲 Жеребьёвка команд</div>
+                        <div class="msg-text">
+                            Владимир → 🇪🇸 Реал Мадрид<br>
+                            Нуриман → 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>
+                            Никита → 🇩🇪 Бавария
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <div class="step">
-                <div class="step-number">2</div>
-                <h3>Настрой участников</h3>
-                <p>Напиши <code>/start</code> → выбери количество игроков → введи имена. 2 минуты.</p>
+            <div class="example-card">
+                <div class="example-label">Таблица</div>
+                <div class="example-body">
+                    <div class="msg bot">
+                        <div class="msg-name">📊 Турнирная таблица</div>
+                        <div class="msg-text">
+                            🥇 Владимир (Реал Мадрид)<br>
+                            2 игр · 4 очка · голы 5:2 (+3)<br><br>
+                            🥈 Нуриман (Ман Сити)<br>
+                            2 игр · 2 очка · голы 3:3 (0)<br><br>
+                            🥉 Никита (Бавария)<br>
+                            2 игр · 0 очков · голы 1:4 (−3)
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <div class="step">
-                <div class="step-number">3</div>
-                <h3>Играйте!</h3>
-                <p>Жми «Новый турнир», играйте матчи, записывайте счёт. Бот всё посчитает.</p>
+            <div class="example-card">
+                <div class="example-label">Профиль</div>
+                <div class="example-body">
+                    <div class="msg bot">
+                        <div class="msg-name">👤 Владимир</div>
+                        <div class="msg-text">
+                            📈 #1 из 4 · 42 очка<br>
+                            🎮 25 матчей · 72% побед<br>
+                            ⚽️ Голы: 58:22 (+36)<br><br>
+                            🏅 Достижения:<br>
+                            🔥 Серия — 5 побед<br>
+                            💯 Ветеран — 50 матчей
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Pricing -->
+<!-- ТАРИФЫ -->
 <section class="pricing">
     <div class="container">
-        <h2>Тарифы</h2>
-        <p class="section-subtitle">Начни бесплатно — купи PRO, когда захочешь больше</p>
+        <div class="section-header">
+            <span class="eyebrow">Тарифы</span>
+            <h2>Начните бесплатно</h2>
+            <p class="section-sub">PRO нужен, только если играете большой компанией или часто</p>
+        </div>
         
         <div class="pricing-grid">
             <div class="pricing-card">
-                <div class="pricing-name">FREE</div>
-                <div class="pricing-price">0₽<span class="price-period">/навсегда</span></div>
+                <div class="pricing-head">
+                    <div class="pricing-name">Бесплатно</div>
+                    <div class="pricing-price">0 ₽</div>
+                    <div class="pricing-period">навсегда</div>
+                </div>
                 <ul class="pricing-features">
-                    <li>✅ До 4 участников</li>
-                    <li>✅ До 5 турниров</li>
-                    <li>✅ Вся статистика</li>
-                    <li>✅ Достижения</li>
-                    <li>✅ Личные встречи</li>
+                    <li>До 4 участников</li>
+                    <li>До 5 турниров</li>
+                    <li>Вся статистика и достижения</li>
+                    <li>Личные встречи</li>
+                    <li>Добавление своих команд</li>
                 </ul>
-                <a href="https://t.me/fc26avangard_bot" class="btn btn-secondary" target="_blank">
+                <a href="https://t.me/fc26avangard_bot" class="btn btn-ghost" target="_blank" rel="noopener">
                     Попробовать
                 </a>
             </div>
             
             <div class="pricing-card featured">
-                <div class="pricing-badge">Популярный</div>
-                <div class="pricing-name">PRO</div>
-                <div class="pricing-price">200₽<span class="price-period">/навсегда</span></div>
+                <div class="pricing-tag">Для компании</div>
+                <div class="pricing-head">
+                    <div class="pricing-name">PRO</div>
+                    <div class="pricing-price">200 ₽</div>
+                    <div class="pricing-period">разово, навсегда</div>
+                </div>
                 <ul class="pricing-features">
-                    <li>✅ До 10 участников</li>
-                    <li>✅ Безлимит турниров</li>
-                    <li>✅ Все фичи FREE</li>
-                    <li>✅ Все будущие фичи</li>
-                    <li>✅ Приоритетная поддержка</li>
+                    <li>До 10 участников</li>
+                    <li>Безлимит турниров</li>
+                    <li>Всё из бесплатной версии</li>
+                    <li>Все будущие функции</li>
+                    <li>Приоритетная поддержка</li>
                 </ul>
-                <a href="https://t.me/ВАШ_БОТ" class="btn btn-primary" target="_blank">
+                <a href="https://t.me/fc26avangard_bot" class="btn btn-primary" target="_blank" rel="noopener">
                     Купить PRO
+                    <span class="btn-arrow">→</span>
                 </a>
             </div>
         </div>
         
         <p class="pricing-note">
-            💡 Оплата разовая — платите 200₽ один раз и пользуетесь навсегда.
+            Платёж разовый — не подписка. PRO привязан к чату, в котором оплатили.
         </p>
     </div>
 </section>
@@ -205,48 +380,55 @@
 <!-- FAQ -->
 <section class="faq">
     <div class="container">
-        <h2>Частые вопросы</h2>
-        <p class="section-subtitle">Что ещё хочешь знать?</p>
+        <div class="section-header">
+            <span class="eyebrow">Вопросы</span>
+            <h2>Коротко о главном</h2>
+        </div>
         
         <div class="faq-list">
             <details class="faq-item">
                 <summary>Это подписка?</summary>
-                <p>Нет, <strong>разовый платёж</strong>. Платите 200₽ один раз — пользуетесь навсегда.</p>
+                <p>Нет. Платите 200 ₽ один раз — пользуетесь навсегда. Никаких ежемесячных списаний.</p>
             </details>
             
             <details class="faq-item">
                 <summary>PRO для одного чата или для всех?</summary>
-                <p><strong>Для одного чата.</strong> Если создадите новый чат — там будет FREE. Это чтобы каждая компания платила за себя.</p>
+                <p>Для одного чата. Если создадите новый — там будет бесплатная версия. Так каждая компания платит за себя.</p>
             </details>
             
             <details class="faq-item">
                 <summary>Как считаются очки?</summary>
-                <p>Победа в основное время — <strong>2:0</strong>. Победа по пенальти — <strong>2:1</strong>. Ничья (без пенальти) — <strong>1:1</strong>.</p>
+                <p>Победа в основное время — 2:0. Победа по пенальти — 2:1. Ничья без пенальти — 1:1. Проигрыш — 0.</p>
             </details>
             
             <details class="faq-item">
-                <summary>Можно ли редактировать результаты?</summary>
-                <p>Да, кнопка «✏️ Редактировать» в активном турнире. Изменения пересчитывают всю статистику.</p>
+                <summary>Можно ли редактировать результат?</summary>
+                <p>Да. В активном турнире есть кнопка «Редактировать» — выбираете матч и вводите новый счёт. Вся статистика пересчитается.</p>
             </details>
             
             <details class="faq-item">
-                <summary>Бот работает в личке?</summary>
-                <p><strong>Нет.</strong> Только в групповых чатах — нужно минимум 2 участника для турнира.</p>
+                <summary>Работает ли бот в личных сообщениях?</summary>
+                <p>Нет. Только в групповых чатах — для турнира нужно минимум два участника.</p>
             </details>
             
             <details class="faq-item">
-                <summary>Где хранятся данные?</summary>
-                <p>В облачной базе данных <strong>PostgreSQL</strong>. Данные не теряются при перезапуске сервера.</p>
+                <summary>Что будет, если я удалю бота из чата?</summary>
+                <p>Данные сохранятся. Добавите обратно — всё восстановится: участники, матчи, турниры.</p>
+            </details>
+            
+            <details class="faq-item">
+                <summary>Можно добавить свои команды?</summary>
+                <p>Да, администратор чата может добавлять и удалять команды через меню. По умолчанию — 43 клуба и 10 сборных.</p>
             </details>
             
             <details class="faq-item">
                 <summary>Сколько матчей в турнире?</summary>
-                <p>2 участника → 1 матч. 3 → 3. 4 → 6. 5 → 10. Формула: <code>N×(N-1)/2</code>.</p>
+                <p>Зависит от количества участников: 2 → 1 матч, 3 → 3, 4 → 6, 5 → 10. Формула: N×(N−1)/2.</p>
             </details>
             
             <details class="faq-item">
-                <summary>Как пригласить друзей?</summary>
-                <p>Просто поделитесь ссылкой на бота. Каждый новый чат получает <strong>свои данные</strong> (изолированно).</p>
+                <summary>Как оплатить PRO?</summary>
+                <p>Пока оплата оформляется вручную — напишите разработчику: <a href="https://t.me/antsn21" target="_blank" rel="noopener">@antsn21</a>. Автоматическая оплата через СБП появится скоро.</p>
             </details>
         </div>
     </div>
@@ -255,40 +437,41 @@
 <!-- CTA -->
 <section class="cta">
     <div class="container">
-        <h2>Готовы прекратить споры?</h2>
-        <p>Добавьте бота в чат — и через 2 минуты начнёте турнир</p>
-        <a href="https://t.me/ВАШ_БОТ" class="btn btn-primary btn-large" target="_blank">
-            🚀 Добавить в Telegram
+        <h2>Попробуйте прямо сейчас</h2>
+        <p>Добавьте бота в чат — через две минуты начнёте первый турнир. Бесплатно, без карты.</p>
+        <a href="https://t.me/fc26avangard_bot" class="btn btn-primary btn-large" target="_blank" rel="noopener">
+            Открыть в Telegram
+            <span class="btn-arrow">→</span>
         </a>
     </div>
 </section>
 
-<!-- Footer -->
+<!-- FOOTER -->
 <footer class="footer">
     <div class="container">
-        <div class="footer-content">
-            <div class="footer-section">
-                <h4>⚽ Турнирный бот</h4>
-                <p>Турниры по FIFA для компании друзей. Без споров, без Excel.</p>
+        <div class="footer-grid">
+            <div>
+                <div class="footer-brand">⚽ Турнирный бот</div>
+                <p class="footer-desc">Турниры по FIFA для компании друзей. Без споров, без Excel, без ручного подсчёта.</p>
             </div>
-            <div class="footer-section">
-                <h4>Ссылки</h4>
-                <ul>
-                    <li><a href="https://t.me/ВАШ_БОТ" target="_blank">Telegram-бот</a></li>
-                    <li><a href="https://t.me/antsn21" target="_blank">Связаться с разработчиком</a></li>
+            <div>
+                <div class="footer-title">Ссылки</div>
+                <ul class="footer-links">
+                    <li><a href="https://t.me/fc26avangard_bot" target="_blank" rel="noopener">Открыть бота</a></li>
+                    <li><a href="https://t.me/antsn21" target="_blank" rel="noopener">Связаться с разработчиком</a></li>
                 </ul>
             </div>
-            <div class="footer-section">
-                <h4>Команды</h4>
-                <ul>
+            <div>
+                <div class="footer-title">Команды</div>
+                <ul class="footer-links">
                     <li><code>/start</code> — главное меню</li>
-                    <li><code>/premium</code> — купить PRO</li>
-                    <li><code>/help</code> — помощь</li>
+                    <li><code>/premium</code> — информация о PRO</li>
+                    <li><code>/setup</code> — перенастроить участников</li>
                 </ul>
             </div>
         </div>
         <div class="footer-bottom">
-            <p>© 2026 Турнирный бот. Сделано с ❤️ для FIFA-сообщества.</p>
+            © 2026 Турнирный бот для FIFA
         </div>
     </div>
 </footer>
