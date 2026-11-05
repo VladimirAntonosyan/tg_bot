@@ -283,29 +283,58 @@ function formatTeamStats() {
         return '🏟️ <b>СТАТИСТИКА КОМАНД</b>\n\n❌ Пока нет сыгранных матчей!';
     }
     
-    // Сортировка: по % побед, затем по количеству матчей
-    const sorted = [...stats].sort((a, b) => {
+    // Разделяем на клубы и сборные
+    const nationalTeamsList = loadNationalTeams();
+    const clubs = stats.filter(s => !nationalTeamsList.includes(s.name));
+    const nationalTeams = stats.filter(s => nationalTeamsList.includes(s.name));
+    
+    // Функция сортировки
+    const sortTeams = (arr) => [...arr].sort((a, b) => {
         const wrA = a.matches > 0 ? a.wins / a.matches : 0;
         const wrB = b.matches > 0 ? b.wins / b.matches : 0;
         if (wrA !== wrB) return wrB - wrA;
         return b.matches - a.matches;
     });
     
+    const sortedClubs = sortTeams(clubs);
+    const sortedNational = sortTeams(nationalTeams);
+    
     let message = '🏟️ <b>СТАТИСТИКА КОМАНД</b>\n\n';
-    message += `<i>Всего команд в статистике: ${stats.length}</i>\n\n`;
     
-    // Показываем топ-15
-    const top = sorted.slice(0, 15);
-    top.forEach((s, idx) => {
-        const winRate = s.matches > 0 ? ((s.wins / s.matches) * 100).toFixed(0) : 0;
-        const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
-        message += `${medal}<b>${s.name}</b>\n`;
-        message += `   🎮 ${s.matches} матчей · ✅ ${s.wins} (${winRate}%) · ❌ ${s.losses} · 🤝 ${s.draws}\n`;
-        message += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst}\n\n`;
-    });
+    // Блок клубов
+    message += `⚽ <b>КЛУБЫ</b> (${clubs.length} команд)\n\n`;
+    if (sortedClubs.length === 0) {
+        message += '<i>Пока нет сыгранных матчей с клубами</i>\n\n';
+    } else {
+        sortedClubs.slice(0, 10).forEach((s, idx) => {
+            const winRate = s.matches > 0 ? ((s.wins / s.matches) * 100).toFixed(0) : 0;
+            const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
+            message += `${medal}<b>${s.name}</b>\n`;
+            message += `   🎮 ${s.matches} матчей · ✅ ${s.wins} (${winRate}%) · ❌ ${s.losses} · 🤝 ${s.draws}\n`;
+            message += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst}\n\n`;
+        });
+        if (sortedClubs.length > 10) {
+            message += `<i>...и ещё ${sortedClubs.length - 10} клубов</i>\n\n`;
+        }
+    }
     
-    if (stats.length > 15) {
-        message += `<i>...и ещё ${stats.length - 15} команд</i>\n`;
+    message += `━━━━━━━━━━━━━━━━━\n\n`;
+    
+    // Блок сборных
+    message += `🌍 <b>СБОРНЫЕ</b> (${nationalTeams.length} команд)\n\n`;
+    if (sortedNational.length === 0) {
+        message += '<i>Пока нет сыгранных матчей со сборными</i>\n\n';
+    } else {
+        sortedNational.slice(0, 10).forEach((s, idx) => {
+            const winRate = s.matches > 0 ? ((s.wins / s.matches) * 100).toFixed(0) : 0;
+            const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
+            message += `${medal}<b>${s.name}</b>\n`;
+            message += `   🎮 ${s.matches} матчей · ✅ ${s.wins} (${winRate}%) · ❌ ${s.losses} · 🤝 ${s.draws}\n`;
+            message += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst}\n\n`;
+        });
+        if (sortedNational.length > 10) {
+            message += `<i>...и ещё ${sortedNational.length - 10} сборных</i>\n`;
+        }
     }
     
     return message;
