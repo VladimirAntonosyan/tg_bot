@@ -170,7 +170,7 @@ h3 {
    ============================================================ */
 .hero {
     position: relative;
-    padding: 100px 0 120px;
+    padding: 100px 0 0; /* нижняя граница без padding — телефон обрежется */
     overflow: hidden;
 }
 
@@ -256,23 +256,28 @@ h3 {
     margin-top: 2px;
 }
 
-/* Phone */
+/* Phone — длинный, нижняя часть обрезается */
 .hero-image {
     display: flex;
     justify-content: center;
+    align-items: flex-end;
+    align-self: stretch;
+    position: relative;
+    padding-top: 40px;
 }
 
 .phone-frame {
     width: 100%;
     max-width: 320px;
     background: #1c1c1e;
-    border-radius: 40px;
-    padding: 8px;
+    border-radius: 40px 40px 0 0;
+    padding: 8px 8px 0;
     box-shadow:
         0 40px 80px rgba(0, 0, 0, 0.6),
         0 0 0 1px rgba(255, 255, 255, 0.06),
         inset 0 0 0 1px rgba(255, 255, 255, 0.04);
     animation: float 6s ease-in-out infinite;
+    margin-bottom: -60px; /* обрезаем низ */
 }
 
 @keyframes float {
@@ -292,9 +297,9 @@ h3 {
 
 .phone-screen {
     background: var(--bg-2);
-    border-radius: 32px;
+    border-radius: 32px 32px 0 0;
     overflow: hidden;
-    padding: 0 0 16px;
+    padding: 0 0 200px; /* большой padding-bottom, чтобы обрезать низ */
 }
 
 .chat-header {
@@ -315,16 +320,30 @@ h3 {
     align-items: center;
     justify-content: center;
     font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.chat-info {
+    flex: 1;
+}
+
+.chat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
 }
 
 .chat-name {
     font-size: 0.85rem;
     font-weight: 600;
+    text-align: left;
 }
 
 .chat-status {
     font-size: 0.7rem;
     color: var(--success);
+    line-height: 1;
 }
 
 .chat-body {
@@ -340,6 +359,7 @@ h3 {
     font-size: 0.78rem;
     line-height: 1.5;
     max-width: 90%;
+    text-align: left;
 }
 
 .msg.bot {
@@ -363,10 +383,12 @@ h3 {
     font-weight: 600;
     color: var(--accent);
     margin-bottom: 4px;
+    text-align: left;
 }
 
 .msg-text {
     color: var(--text);
+    text-align: left;
 }
 
 .msg-text strong {
@@ -374,64 +396,11 @@ h3 {
 }
 
 /* ============================================================
-   PROBLEM
-   ============================================================ */
-.problem {
-    padding: 100px 0;
-    background: var(--bg-2);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-}
-
-.problem-header {
-    text-align: center;
-    margin-bottom: 56px;
-}
-
-.problem-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
-    margin-bottom: 48px;
-}
-
-.problem-item {
-    display: flex;
-    gap: 16px;
-    padding: 24px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    transition: border-color 0.25s;
-}
-
-.problem-item:hover {
-    border-color: var(--border-hover);
-}
-
-.problem-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-.problem-item p {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-}
-
-.problem-resolve {
-    text-align: center;
-    font-size: 1.15rem;
-    font-weight: 500;
-    color: var(--text);
-}
-
-/* ============================================================
    HOW
    ============================================================ */
 .how {
     padding: 100px 0;
+    border-bottom: 1px solid var(--border);
 }
 
 .steps {
@@ -477,7 +446,6 @@ h3 {
 .features {
     padding: 100px 0;
     background: var(--bg-2);
-    border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
 }
 
@@ -501,10 +469,33 @@ h3 {
     transform: translateY(-2px);
 }
 
+/* Стильные иконки — квадрат с градиентной обводкой и мягким фоном */
+.feature-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(167, 139, 250, 0.14));
+    border: 1px solid rgba(34, 211, 238, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-icon-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.08), transparent 60%);
+    pointer-events: none;
+}
+
 .feature-icon {
-    font-size: 1.75rem;
-    margin-bottom: 16px;
+    font-size: 1.35rem;
     line-height: 1;
+    filter: saturate(1.1);
 }
 
 .feature-card h3 {
@@ -814,6 +805,10 @@ h3 {
    RESPONSIVE
    ============================================================ */
 @media (max-width: 900px) {
+    .hero {
+        padding-bottom: 0;
+    }
+    
     .hero .container {
         grid-template-columns: 1fr;
         gap: 48px;
@@ -833,6 +828,19 @@ h3 {
         justify-content: center;
     }
     
+    .hero-image {
+        padding-top: 20px;
+        align-self: auto;
+    }
+    
+    .phone-frame {
+        margin-bottom: 0;
+    }
+    
+    .phone-screen {
+        padding-bottom: 32px;
+    }
+    
     .footer-grid {
         grid-template-columns: 1fr;
         gap: 32px;
@@ -841,7 +849,7 @@ h3 {
 
 @media (max-width: 600px) {
     .hero {
-        padding: 64px 0 80px;
+        padding: 64px 0 0;
     }
     
     .hero-buttons {
@@ -861,7 +869,6 @@ h3 {
         font-size: 1.6rem;
     }
     
-    .problem,
     .how,
     .features,
     .examples,
@@ -877,8 +884,7 @@ h3 {
     
     .feature-card,
     .step,
-    .pricing-card,
-    .problem-item {
+    .pricing-card {
         padding: 22px;
     }
     
