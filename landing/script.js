@@ -40,6 +40,8 @@ initDragCarousel('.examples-carousel');
 initDragCarousel('.features-carousel');
 
 
+
+
 // ============================================================
 // HERO ANIMATION — интерактивный тур по боту
 // ============================================================
@@ -101,7 +103,11 @@ initDragCarousel('.features-carousel');
         }
         
         chatBody.appendChild(msg);
-        chatBody.scrollTop = chatBody.scrollHeight;
+        
+        requestAnimationFrame(() => {
+            chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
+        });
+        
         return msg;
     }
     
@@ -134,9 +140,26 @@ initDragCarousel('.features-carousel');
         b.textContent = text;
         b.dataset.id = id;
         kb.appendChild(b);
-        chatBody.scrollTop = chatBody.scrollHeight;
+        
+        requestAnimationFrame(() => {
+            chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
+        });
+        
         return b;
     }
+    
+    // ============================================================
+    // ЧТО «ПИШЕТ» ПОЛЬЗОВАТЕЛЬ ПРИ КЛИКЕ НА КНОПКУ
+    // ============================================================
+    
+    const COMMANDS = {
+        'new-tournament': '🏆 Новый турнир',
+        'teams-list': '📋 Список команд',
+        'rating': '📈 Общий рейтинг',
+        'h2h': '⚔️ Личные встречи',
+        'profile': '👤 Профиль',
+        'team-stats': '🏟️ Статистика команд'
+    };
     
     // ============================================================
     // СЦЕНАРИИ
@@ -146,8 +169,6 @@ initDragCarousel('.features-carousel');
         
         // ========== НОВЫЙ ТУРНИР (полный цикл) ==========
         'new-tournament': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="new-tournament"]')), 400);
-            
             let participantsMsg;
             delay(() => {
                 participantsMsg = createMsg({
@@ -348,37 +369,32 @@ initDragCarousel('.features-carousel');
         
         // ========== СПИСОК КОМАНД ============
         'teams-list': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="teams-list"]')), 300);
-            
             delay(() => {
                 createMsg({
                     type: 'bot',
                     name: '📋 Список команд',
                     text: '<strong>⚽ КЛУБЫ (43):</strong><br>1. 🇪🇸 Реал Мадрид<br>2. 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>3. 🇩🇪 Бавария<br>4. 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Арсенал<br>5. 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Ливерпуль<br>... и ещё 38<br><br><strong>🌍 СБОРНЫЕ (10):</strong><br>1. 🇦🇷 Аргентина<br>2. 🇫🇷 Франция<br>3. 🇧🇷 Бразилия<br>4. 🇬🇧 Англия<br>... и ещё 6'
                 });
-            }, 1000);
+            }, 900);
         },
         
         // ========== ОБЩИЙ РЕЙТИНГ ============
         'rating': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="rating"]')), 300);
-            
             delay(() => {
                 createMsg({
                     type: 'bot',
                     name: '📈 ОБЩИЙ РЕЙТИНГ ИГРОКОВ',
                     text: '🥇 <strong>Владимир</strong> — 42 очка<br>🎮 25 матчей · ✅ 18 (72%) · ❌ 4 · 🤝 3<br>🥅 Пенальти: 2 / 1<br>⚽️ Голы: 58:22 (+36)<br>🏆 Турниров: 5 из 12<br><br>🥈 <strong>Нуриман</strong> — 35 очков<br>🎮 24 матча · ✅ 15 (63%) · ❌ 6 · 🤝 3<br>🥅 Пенальти: 3 / 2<br>⚽️ Голы: 47:30 (+17)<br>🏆 Турниров: 3 из 12<br><br>🥉 <strong>Никита</strong> — 28 очков<br>🎮 22 матча · ✅ 12 (55%) · ❌ 7 · 🤝 3<br>⚽️ Голы: 40:28 (+12)<br>🏆 Турниров: 2 из 12'
                 });
-            }, 1000);
+            }, 900);
         },
         
-        // ========== ЛИЧНЫЕ ВСТРЕЧИ ============
+        // ========== ЛИЧНЫЕ ВСТРЕЧИ (два игрока) ============
         'h2h': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="h2h"]')), 300);
-            
-            let pickMsg;
+            // Шаг 1: выбор первого игрока
+            let pickMsg1;
             delay(() => {
-                pickMsg = createMsg({
+                pickMsg1 = createMsg({
                     type: 'bot',
                     name: '⚔️ ЛИЧНЫЕ ВСТРЕЧИ',
                     text: 'Выбери первого игрока:',
@@ -388,24 +404,40 @@ initDragCarousel('.features-carousel');
                         { id: 'h3', text: 'Никита' }
                     ]
                 });
-            }, 1000);
+            }, 900);
             
-            delay(() => { if (pickMsg) tapInlineBtn(pickMsg, 'h1'); }, 1800);
-            delay(() => { if (pickMsg) markSelected(pickMsg, 'h1', '✅ Владимир'); }, 2000);
+            delay(() => { if (pickMsg1) tapInlineBtn(pickMsg1, 'h1'); }, 1700);
+            delay(() => { if (pickMsg1) markSelected(pickMsg1, 'h1', '✅ Владимир'); }, 1900);
             
+            // Шаг 2: выбор второго игрока
+            let pickMsg2;
+            delay(() => {
+                pickMsg2 = createMsg({
+                    type: 'bot',
+                    name: '⚔️ ЛИЧНЫЕ ВСТРЕЧИ',
+                    text: 'Первый игрок: <strong>Владимир</strong><br><br>Теперь выбери второго:',
+                    inline: [
+                        { id: 'h2b', text: 'Нуриман' },
+                        { id: 'h3b', text: 'Никита' }
+                    ]
+                });
+            }, 2500);
+            
+            delay(() => { if (pickMsg2) tapInlineBtn(pickMsg2, 'h2b'); }, 3300);
+            delay(() => { if (pickMsg2) markSelected(pickMsg2, 'h2b', '✅ Нуриман'); }, 3500);
+            
+            // Шаг 3: показываем статистику
             delay(() => {
                 createMsg({
                     type: 'bot',
                     name: '⚔️ ЛИЧНЫЕ ВСТРЕЧИ',
                     text: '<strong>Владимир</strong> vs <strong>Нуриман</strong><br><br>📊 Всего матчей: <strong>8</strong><br>✅ Владимир побед: 5<br>✅ Нуриман побед: 2<br>🤝 Ничьих: 1<br><br>🥅 Пенальти:<br>• Владимир: 1<br>• Нуриман: 1<br><br>⚽️ Голы:<br>Владимир: 18<br>Нуриман: 12<br>Всего: 30 (в среднем 3.8 за матч)<br><br><strong>📜 Последние матчи:</strong><br>1. ✅ 05.11: Владимир 3:1 Нуриман<br>2. ❌ 03.11: Нуриман 2:1 Владимир<br>3. ✅ 01.11: Владимир 2:2 Нуриман (пен. Владимир)'
                 });
-            }, 2700);
+            }, 4300);
         },
         
         // ========== ПРОФИЛЬ ============
         'profile': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="profile"]')), 300);
-            
             let pickMsg;
             delay(() => {
                 pickMsg = createMsg({
@@ -418,10 +450,10 @@ initDragCarousel('.features-carousel');
                         { id: 'pr3', text: 'Никита' }
                     ]
                 });
-            }, 1000);
+            }, 900);
             
-            delay(() => { if (pickMsg) tapInlineBtn(pickMsg, 'pr1'); }, 1800);
-            delay(() => { if (pickMsg) markSelected(pickMsg, 'pr1', '✅ Владимир'); }, 2000);
+            delay(() => { if (pickMsg) tapInlineBtn(pickMsg, 'pr1'); }, 1700);
+            delay(() => { if (pickMsg) markSelected(pickMsg, 'pr1', '✅ Владимир'); }, 1900);
             
             delay(() => {
                 createMsg({
@@ -434,15 +466,13 @@ initDragCarousel('.features-carousel');
         
         // ========== СТАТИСТИКА КОМАНД ============
         'team-stats': function() {
-            delay(() => pressKeyboardBtn(document.querySelector('[data-action="team-stats"]')), 300);
-            
             delay(() => {
                 createMsg({
                     type: 'bot',
                     name: '🏟️ СТАТИСТИКА КОМАНД',
                     text: '<strong>⚽ КЛУБЫ (топ-5):</strong><br><br>🥇 🇪🇸 Реал Мадрид<br>🎮 8 матчей · ✅ 6 (75%) · ❌ 1 · 🤝 1<br>⚽️ Голы: 22:10<br><br>🥈 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Манчестер Сити<br>🎮 12 матчей · ✅ 8 (67%) · ❌ 3 · 🤝 1<br>⚽️ Голы: 30:18<br><br>🥉 🇩🇪 Бавария<br>🎮 6 матчей · ✅ 4 (67%) · ❌ 2 · 🤝 0<br>⚽️ Голы: 15:9<br><br>━━━━━━━━━━━━━━━━━<br><br><strong>🌍 СБОРНЫЕ (топ-3):</strong><br><br>🥇 🇦🇷 Аргентина<br>🎮 5 матчей · ✅ 4 (80%) · ❌ 1 · 🤝 0<br>⚽️ Голы: 12:5<br><br>🥈 🇫🇷 Франция<br>🎮 5 матчей · ✅ 3 (60%) · ❌ 2 · 🤝 0<br>⚽️ Голы: 10:8<br><br>🥉 🇧🇷 Бразилия<br>🎮 4 матча · ✅ 2 (50%) · ❌ 2 · 🤝 0<br>⚽️ Голы: 8:7'
                 });
-            }, 1000);
+            }, 900);
         }
     };
     
@@ -483,6 +513,15 @@ initDragCarousel('.features-carousel');
             return;
         }
         
+        // Сначала отправляем сообщение-команду от «пользователя»
+        const commandText = COMMANDS[action];
+        if (commandText) {
+            delay(() => {
+                createMsg({ type: 'user', text: commandText });
+            }, 150);
+        }
+        
+        // Потом запускаем сценарий
         const scenario = SCENARIOS[action];
         if (scenario) {
             scenario();
