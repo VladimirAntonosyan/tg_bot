@@ -267,26 +267,24 @@ h3 {
 }
 
 .phone-frame {
+    background: url(mock.png) 100% / cover;
+    background-position: top;
     width: 100%;
     max-width: 360px;
-    background: #1c1c1e;
-    border-radius: 40px 40px 0 0;
-    padding: 8px 8px 0;
-    box-shadow:
-        0 40px 80px rgba(0, 0, 0, 0.6),
-        0 0 0 1px rgba(255, 255, 255, 0.06),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-   position: relative;
-   height: 636px;
+    border-radius: 62px 62px 0 0;
+    padding: 16px 18px 0;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+    position: relative;
+    height: 636px;
 }
 
 .phone-notch {
     margin: 0;
-    width: 82px;
+    width: 90px;
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    top: 16px;
+    top: 28px;
     border-radius: 100px;
     z-index: 3;
     background: #000000;
@@ -295,7 +293,7 @@ h3 {
 
 .phone-screen {
     background: var(--bg-2);
-    border-radius: 32px 32px 0 0;
+    border-radius: 46px 46px 0 0;
     overflow: hidden;
     height: 100%;
 }
@@ -312,18 +310,35 @@ h3 {
     transform: translateX(-50%);
     left: 50%;
     border-radius: 32px;
-    top: 50px;
-    padding: 4px 12px;
-    height: 42px;
+    top: 64px;
+    padding: 0px 12px;
+    height: 38px;
     border-bottom: 1px solid var(--border);
+}
+
+.chat-back {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(5px);
+    background-color: rgba(255, 255, 255, .1);
+    position: absolute;
+    z-index: 2;
+    min-width: 38px;
+    left: 30px;
+    border-radius: 32px;
+    top: 64px;
+    padding: 0px 12px;
+    height: 38px;
+    border-bottom: 1px;
 }
 
 .chat-avatar {
     position: absolute;
-    right: 20px;
-    top: 49px;
-    height: 42px;
-    width: 42px;
+    right: 30px;
+    top: 64px;
+    height: 38px;
+    width: 38px;
     z-index: 2;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -528,15 +543,15 @@ h3 {
 .bot-keyboard {
     position: absolute;
     bottom: 0;
-    left: 8px;
-    right: 8px;
+    left: 18px;
+    right: 18px;
     padding: 8px 6px 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
     background: rgba(20, 25, 38, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
