@@ -395,6 +395,87 @@ h3 {
     color: var(--accent);
 }
 
+/* ============================================================
+   HERO ANIMATION
+   ============================================================ */
+
+/* Появление сообщения */
+.msg-anim {
+    animation: msgAppear 0.35s ease-out forwards;
+}
+
+@keyframes msgAppear {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Исчезновение (для финального fade-out не используем — остаёмся на таблице) */
+
+/* Подсветка нажатой кнопки клавиатуры */
+.bot-keyboard-btn.pressed {
+    background: rgba(34, 211, 238, 0.25);
+    border-color: rgba(34, 211, 238, 0.5);
+    transform: scale(0.96);
+}
+
+/* Inline-кнопки внутри сообщения */
+.inline-kb {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.inline-kb-btn {
+    padding: 6px 10px;
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.7rem;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.inline-kb-btn.selected {
+    background: rgba(34, 211, 238, 0.25);
+    border-color: rgba(34, 211, 238, 0.6);
+    color: var(--accent);
+}
+
+.inline-kb-btn.primary {
+    background: rgba(167, 139, 250, 0.15);
+    border-color: rgba(167, 139, 250, 0.4);
+    color: var(--accent-2);
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Курсор для кнопок «как будто можно нажать» */
+.bot-keyboard-btn,
+.inline-kb-btn {
+    user-select: none;
+}
+
+/* prefers-reduced-motion — отключаем анимации */
+@media (prefers-reduced-motion: reduce) {
+    .msg-anim {
+        animation: none;
+    }
+    .bot-keyboard-btn.pressed {
+        transform: none;
+    }
+}
+
+
 /* Клавиатура бота (reply keyboard, как в Telegram iOS) */
 .bot-keyboard {
     position: absolute;
