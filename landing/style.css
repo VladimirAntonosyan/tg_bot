@@ -440,18 +440,49 @@ h3 {
 }
 
 /* ============================================================
-   FEATURES
+   FEATURES (карусель в 2 ряда)
    ============================================================ */
 .features {
     padding: 100px 0;
     background: var(--bg-2);
     border-bottom: 1px solid var(--border);
+    overflow: hidden;
 }
 
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
+.features-carousel {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    cursor: grab;
+    user-select: none;
+}
+
+.features-carousel:active {
+    cursor: grabbing;
+}
+
+.features-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.features-track {
+    display: flex;
+    gap: 64px;
+    padding-left: max(24px, calc((100vw - 1180px) / 2 + 24px));
+    padding-right: max(24px, calc((100vw - 1180px) / 2 + 24px));
+    padding-top: 8px;
+    padding-bottom: 8px;
+    width: max-content;
+}
+
+.feature-slide {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    flex-shrink: 0;
+    width: 320px;
 }
 
 .feature-card {
@@ -460,6 +491,7 @@ h3 {
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     transition: all 0.25s ease;
+    flex: 1;
 }
 
 .feature-card:hover {
@@ -507,7 +539,6 @@ h3 {
     font-size: 0.9rem;
     line-height: 1.55;
 }
-
 
 /* ============================================================
    EXAMPLES (простой горизонтальный скролл)
@@ -1057,5 +1088,14 @@ h3 {
     
     .phone-screen-sm {
         min-height: 320px;
+    }
+
+       .feature-slide {
+        width: 280px;
+        gap: 16px;
+    }
+    
+    .feature-card {
+        padding: 20px;
     }
 }
