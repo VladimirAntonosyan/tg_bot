@@ -517,30 +517,153 @@ h3 {
 
 .examples-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 32px;
 }
 
-.example-card {
+.example-phone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Маленький айфон */
+.phone-frame-sm {
+    width: 100%;
+    max-width: 260px;
+    background: #1c1c1e;
+    border-radius: 32px;
+    padding: 6px;
+    box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.06),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.example-phone:hover .phone-frame-sm {
+    transform: translateY(-4px);
+    box-shadow:
+        0 30px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(34, 211, 238, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.phone-notch-sm {
+    width: 70px;
+    height: 18px;
+    background: #000;
+    border-radius: 100px;
+    margin: 0 auto 4px;
+    position: relative;
+    z-index: 2;
+}
+
+.phone-screen-sm {
+    background: var(--bg-2);
+    border-radius: 26px;
+    overflow: hidden;
+    padding-bottom: 12px;
+    min-height: 360px;
+}
+
+.chat-header-sm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--border);
+}
+
+.chat-avatar-sm {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.chat-info-sm {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.chat-name-sm {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: left;
+    line-height: 1.2;
+}
+
+.chat-status-sm {
+    font-size: 0.62rem;
+    color: var(--success);
+    line-height: 1;
+    text-align: left;
+}
+
+.chat-body-sm {
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.msg-sm {
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    line-height: 1.45;
+    max-width: 92%;
+    text-align: left;
+}
+
+.msg-sm.bot {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
 }
 
-.example-label {
-    padding: 12px 20px;
-    font-size: 0.78rem;
+.msg-sm.user {
+    background: rgba(34, 211, 238, 0.15);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    color: var(--accent);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.02);
 }
 
-.example-body {
-    padding: 20px;
+.msg-name-sm {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 3px;
+    text-align: left;
+}
+
+.msg-text-sm {
+    color: var(--text);
+    text-align: left;
+}
+
+.msg-text-sm strong {
+    color: var(--accent);
+}
+
+.example-caption {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: center;
+    font-weight: 500;
 }
 
 /* ============================================================
@@ -889,5 +1012,18 @@ h3 {
     
     .pricing-price {
         font-size: 2.25rem;
+    }
+
+       .examples-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+    
+    .phone-frame-sm {
+        max-width: 240px;
+    }
+    
+    .phone-screen-sm {
+        min-height: 320px;
     }
 }
