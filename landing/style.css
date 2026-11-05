@@ -353,6 +353,28 @@ h3 {
     gap: 8px;
     overflow-y: auto;
     height: 387px;
+    
+    /* Плавный скролл */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;  /* плавный скролл на iOS */
+    overscroll-behavior-y: contain;      /* не «прыгает» на родителя */
+    
+    /* Скрыть скроллбар (как в iOS) */
+    scrollbar-width: none;               /* Firefox */
+    -ms-overflow-style: none;            /* IE/Edge */
+}
+
+/* Скрыть скроллбар в Chrome/Safari/Opera */
+.chat-body::-webkit-scrollbar {
+    display: none;
+}
+
+/* Отступ снизу, чтобы последнее сообщение не залезало под клавиатуру */
+.chat-body::after {
+    content: '';
+    display: block;
+    height: 8px;
+    flex-shrink: 0;
 }
 
 .msg {
