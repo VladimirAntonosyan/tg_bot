@@ -1,5 +1,6 @@
-(function() {
-    const carousel = document.querySelector('.examples-carousel');
+// Универсальная drag-карусель
+function initDragCarousel(selector) {
+    const carousel = document.querySelector(selector);
     if (!carousel) return;
     
     let isDown = false;
@@ -27,10 +28,13 @@
         if (!isDown) return;
         e.preventDefault();
         const x = e.pageX - carousel.offsetLeft;
-        const walk = (x - startX) * 1.5; // скорость
+        const walk = (x - startX) * 1.5;
         carousel.scrollLeft = scrollLeft - walk;
     });
     
-    // Курсор grab
     carousel.style.cursor = 'grab';
-})();
+}
+
+// Инициализируем все карусели
+initDragCarousel('.examples-carousel');
+initDragCarousel('.features-carousel');
