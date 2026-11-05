@@ -276,13 +276,7 @@ h3 {
         0 40px 80px rgba(0, 0, 0, 0.6),
         0 0 0 1px rgba(255, 255, 255, 0.06),
         inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-    animation: float 6s ease-in-out infinite;
     margin-bottom: -60px; /* обрезаем низ */
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-14px); }
 }
 
 .phone-notch {
