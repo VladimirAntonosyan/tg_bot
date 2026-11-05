@@ -187,6 +187,24 @@ async function setNationalTeams(chatId, names) {
     }
 }
 
+async function addNationalTeam(chatId, name) {
+    try {
+        await pool.query('INSERT INTO national_teams (chat_id, name) VALUES ($1, $2)', [chatId, name]);
+        return true;
+    } catch (error) {
+        if (error.code === '23505') return false; // уже есть
+        throw error;
+    }
+}
+
+async function removeNationalTeam(chatId, name) {
+    const result = await pool.query(
+        'DELETE FROM national_teams WHERE chat_id = $1 AND name = $2',
+        [chatId, name]
+    );
+    return result.rowCount > 0;
+}
+
 // ============ МАТЧИ ============
 
 async function recordMatch(chatId, match, participants, tournamentType) {
@@ -311,7 +329,7 @@ module.exports = {
     // Clubs
     getClubs, addClub, removeClub, setClubs,
     // National teams
-    getNationalTeams, setNationalTeams,
+    getNationalTeams, setNationalTeams, addNationalTeam, removeNationalTeam,
     // Matches
     recordMatch, getAllMatches,
     // Tournaments
