@@ -263,11 +263,13 @@ h3 {
     align-items: flex-end;
     align-self: stretch;
     position: relative;
+    max-height: 616px;
+    overflow: image;
 }
 
 .phone-frame {
     width: 100%;
-    max-width: 320px;
+    max-width: 360px;
     background: #1c1c1e;
     border-radius: 40px 40px 0 0;
     padding: 8px 8px 0;
@@ -276,7 +278,7 @@ h3 {
         0 0 0 1px rgba(255, 255, 255, 0.06),
         inset 0 0 0 1px rgba(255, 255, 255, 0.04);
    position: relative;
-   height: 500px;
+   height: 636px;
 }
 
 .phone-notch {
@@ -285,11 +287,11 @@ h3 {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    top: 20px;
+    top: 16px;
     border-radius: 100px;
     z-index: 2;
-    background: #000000;
-    height: 22px;
+    background: #151515;
+    height: 26px;
 }
 
 .phone-screen {
@@ -398,8 +400,8 @@ h3 {
 .bot-keyboard {
     position: absolute;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: 8px;
+    right: 8px;
     padding: 8px 6px 12px;
     display: flex;
     flex-direction: column;
