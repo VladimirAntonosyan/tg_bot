@@ -55,6 +55,29 @@ async function getLimits(chatId) {
     return LIMITS[sub.tier || 'free'] || LIMITS.free;
 }
 
+// ============ АЧИВКИ ============
+
+const ACHIEVEMENTS = {
+    streak: {
+        id: 'streak',
+        name: 'Серия',
+        emoji: '🔥',
+        description: '5 побед подряд'
+    },
+    veteran: {
+        id: 'veteran',
+        name: 'Ветеран',
+        emoji: '💯',
+        description: '50 матчей'
+    },
+    perfect_penalty: {
+        id: 'perfect_penalty',
+        name: 'Идеальный пенальтист',
+        emoji: '🎯',
+        description: '5+ побед по пенальти без поражений'
+    }
+};
+
 // ============ ИНИЦИАЛИЗАЦИЯ ============
 
 async function initializeBot() {
@@ -390,6 +413,159 @@ async function calculateGlobalStats(chatId) {
     return Object.values(playerStats);
 }
 
+// ============ АЧИВКИ ============
+
+async function calculateAchievements(chatId, playerName) {
+    const records = await db.getAllMatches(chatId);
+    const achievements = [];
+    
+    const sortedMatches = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    let matchesPlayed = 0;
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let penaltyWins = 0;
+    let penaltyLosses = 0;
+    
+    sortedMatches.forEach(m => {
+        const isPlayer1 = m.player1 === playerName;
+        const isPlayer2 = m.player2 === playerName;
+        if (!isPlayer1 && !isPlayer2) return;
+        
+        matchesPlayed++;
+        
+        let isWin = false;
+        
+        if (m.penalties) {
+            if (m.penalties === playerName) {
+                isWin = true;
+                penaltyWins++;
+            } else {
+                penaltyLosses++;
+            }
+        } else if (isPlayer1) {
+            if (m.score1 > m.score2) isWin = true;
+        } else if (isPlayer2) {
+            if (m.score2 > m.score1) isWin = true;
+        }
+        
+        if (isWin) {
+            currentStreak++;
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
+        } else {
+            currentStreak = 0;
+        }
+    });
+    
+    if (maxStreak >= 5) {
+        achievements.push({ ...ACHIEVEMENTS.streak, progress: `${maxStreak} побед` });
+    }
+    
+    if (matchesPlayed >= 50) {
+        achievements.push({ ...ACHIEVEMENTS.veteran, progress: `${matchesPlayed} матчей` });
+    }
+    
+    if (penaltyWins >= 5 && penaltyLosses === 0) {
+        achievements.push({ ...ACHIEVEMENTS.perfect_penalty, progress: `${penaltyWins} побед, 0 поражений` });
+    }
+    
+    return {
+        achievements,
+        currentStreak,
+        maxStreak,
+        matchesPlayed,
+        penaltyWins,
+        penaltyLosses
+    };
+}
+
+async function formatPlayerProfile(chatId, playerName) {
+    const allStats = await calculateGlobalStats(chatId);
+    const playerStats = allStats.find(s => s.name === playerName);
+    
+    if (!playerStats) {
+        return `👤 <b>${playerName}</b>\n\n❌ Игрок не найден!`;
+    }
+    
+    const achievementsData = await calculateAchievements(chatId, playerName);
+    
+    const sorted = [...allStats].sort((a, b) => {
+        if (a.points !== b.points) return b.points - a.points;
+        if (a.wins !== b.wins) return b.wins - a.wins;
+        const diffA = a.goalsFor - a.goalsAgainst;
+        const diffB = b.goalsFor - b.goalsAgainst;
+        return diffB - diffA;
+    });
+    const rank = sorted.findIndex(s => s.name === playerName) + 1;
+    
+    let profile = `👤 <b>ПРОФИЛЬ ИГРОКА</b>\n\n`;
+    profile += `<b>${playerName}</b>\n\n`;
+    
+    profile += `📈 <b>Место в рейтинге:</b> #${rank} из ${allStats.length}\n`;
+    profile += `💎 <b>Очков:</b> ${playerStats.points}\n\n`;
+    
+    profile += `<b>📊 СТАТИСТИКА:</b>\n`;
+    profile += `🎮 Матчей: ${playerStats.matchesPlayed}\n`;
+    
+    if (playerStats.matchesPlayed > 0) {
+        const winRate = ((playerStats.wins / playerStats.matchesPlayed) * 100).toFixed(0);
+        profile += `✅ Побед: ${playerStats.wins} (${winRate}%)\n`;
+    } else {
+        profile += `✅ Побед: 0\n`;
+    }
+    
+    profile += `❌ Поражений: ${playerStats.losses}\n`;
+    profile += `🤝 Ничьих: ${playerStats.draws}\n`;
+    profile += `🥅 Пенальти: ${playerStats.penaltyWins} / ${playerStats.penaltyLosses}\n\n`;
+    
+    const diff = playerStats.goalsFor - playerStats.goalsAgainst;
+    profile += `<b>⚽️ ГОЛЫ:</b>\n`;
+    profile += `Забито: ${playerStats.goalsFor}\n`;
+    profile += `Пропущено: ${playerStats.goalsAgainst}\n`;
+    profile += `Разница: ${diff >= 0 ? '+' : ''}${diff}\n\n`;
+    
+    if (achievementsData.currentStreak >= 3) {
+        profile += `🔥 <b>Текущая серия:</b> ${achievementsData.currentStreak} побед\n`;
+    }
+    if (achievementsData.maxStreak >= 3) {
+        profile += `📈 <b>Лучшая серия:</b> ${achievementsData.maxStreak} побед\n`;
+    }
+    if (achievementsData.currentStreak >= 3 || achievementsData.maxStreak >= 3) {
+        profile += `\n`;
+    }
+    
+    profile += `<b>🏆 ТУРНИРЫ:</b>\n`;
+    profile += `Побед: ${playerStats.tournamentsWon} из ${playerStats.tournamentsPlayed}\n\n`;
+    
+    profile += `<b>🏅 ДОСТИЖЕНИЯ:</b>\n`;
+    if (achievementsData.achievements.length === 0) {
+        profile += `<i>Пока нет. Играй больше!</i>\n\n`;
+        profile += `<i>Доступные ачивки:</i>\n`;
+        profile += `🔥 Серия — 5 побед подряд\n`;
+        profile += `💯 Ветеран — 50 матчей\n`;
+        profile += `🎯 Идеальный пенальтист — 5+ побед по пенальти без поражений\n`;
+    } else {
+        achievementsData.achievements.forEach(a => {
+            profile += `${a.emoji} <b>${a.name}</b> — ${a.description}\n`;
+            profile += `   <i>${a.progress}</i>\n`;
+        });
+    }
+    
+    return profile;
+}
+
+function createProfileSelectionKeyboard(participants) {
+    const inlineKeyboard = [];
+    let row = [];
+    for (const participant of participants) {
+        row.push({ text: participant.name, callback_data: `profile_${participant.name}` });
+        if (row.length === 2) { inlineKeyboard.push(row); row = []; }
+    }
+    if (row.length > 0) inlineKeyboard.push(row);
+    inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'profile_cancel' }]);
+    return { reply_markup: { inline_keyboard: inlineKeyboard } };
+}
+
 // ============ СТАТИСТИКА КОМАНД ============
 
 async function getTeamStats(chatId) {
@@ -675,8 +851,8 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     const keyboard = [
         [{ text: '🏆 Новый турнир' }, { text: '📋 Список команд' }],
         [{ text: '📈 Общий рейтинг' }, { text: '⚔️ Личные встречи' }],
-        [{ text: '🏟️ Статистика команд' }, { text: '💎 PRO' }],
-        [{ text: '❓ Помощь' }]
+        [{ text: '👤 Профиль' }, { text: '🏟️ Статистика команд' }],
+        [{ text: '💎 PRO' }, { text: '❓ Помощь' }]
     ];
     
     if (isAdminUser) {
@@ -919,6 +1095,47 @@ bot.on('callback_query', async (callbackQuery) => {
         }
         
         if (data === 'reset_cancel') {
+            await bot.editMessageText('❌ Отменено', { chat_id: chatId, message_id: messageId });
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        // Профиль игрока
+        if (data.startsWith('profile_') && data !== 'profile_cancel' && data !== 'profile_back') {
+            const playerName = data.replace('profile_', '');
+            const profileText = await formatPlayerProfile(chatId, playerName);
+            await bot.editMessageText(profileText, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '◀️ К выбору игрока', callback_data: 'profile_back' }]
+                    ]
+                }
+            });
+            saveMessageId(chatId, messageId);
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        if (data === 'profile_back') {
+            const participants = await db.getParticipants(chatId);
+            await bot.editMessageText(
+                '👤 <b>ПРОФИЛЬ ИГРОКА</b>\n\nВыбери игрока:',
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    ...createProfileSelectionKeyboard(participants)
+                }
+            );
+            saveMessageId(chatId, messageId);
+            await bot.answerCallbackQuery(callbackQuery.id);
+            return;
+        }
+        
+        if (data === 'profile_cancel') {
             await bot.editMessageText('❌ Отменено', { chat_id: chatId, message_id: messageId });
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1391,6 +1608,19 @@ bot.on('message', async (msg) => {
                 saveMessageId(chatId, hMsg.message_id);
                 break;
                 
+            case '👤 Профиль':
+                const profileParticipants = await db.getParticipants(chatId);
+                if (profileParticipants.length === 0) {
+                    bot.sendMessage(chatId, '❌ Нет участников. Настрой: /setup');
+                    break;
+                }
+                const profileMsg = await bot.sendMessage(chatId,
+                    '👤 <b>ПРОФИЛЬ ИГРОКА</b>\n\nВыбери игрока:',
+                    { parse_mode: 'HTML', ...createProfileSelectionKeyboard(profileParticipants) }
+                );
+                saveMessageId(chatId, profileMsg.message_id);
+                break;
+                
             case '🏟️ Статистика команд':
                 const teamStats = await formatTeamStats(chatId);
                 const tsMsg = await bot.sendMessage(chatId, teamStats, { parse_mode: 'HTML' });
@@ -1516,7 +1746,7 @@ bot.on('message', async (msg) => {
             case '❓ Помощь':
                 const help = currentTournament ?
                     `<b>🎯 ТУРНИР ИДЕТ</b>\n\n✏️ Записать — счет\n📊 Таблица\n✏️ Редактировать\n🏆 Завершить\n⚠️ Прервать` :
-                    `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n🏟️ Статистика команд\n💎 PRO\n\n<b>Для админов:</b>\n⚙️ Настройки`;
+                    `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n👤 Профиль\n🏟️ Статистика команд\n💎 PRO\n\n<b>Для админов:</b>\n⚙️ Настройки`;
                 const hM = await bot.sendMessage(chatId, help, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
                 saveMessageId(chatId, hM.message_id);
                 break;
