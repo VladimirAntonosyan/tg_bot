@@ -253,14 +253,15 @@
 
 <!-- ПРИМЕРЫ -->
 <section class="examples">
-    <div class="container">
-        <div class="section-header">
-            <span class="eyebrow">Из чата</span>
-            <h2>Как это выглядит вживую</h2>
-            <p class="section-sub">Реальные сообщения из Telegram — без монтажа и скриншотов</p>
-        </div>
-        
-        <div class="examples-grid">
+    <div class="section-header">
+        <span class="eyebrow">Из чата</span>
+        <h2>Как это выглядит вживую</h2>
+        <p class="section-sub">Реальные сообщения из Telegram — без монтажа и скриншотов</p>
+    </div>
+    
+    <div class="examples-carousel" id="examplesCarousel">
+        <div class="examples-track">
+            
             <!-- 1. Жеребьёвка -->
             <div class="example-phone">
                 <div class="phone-frame-sm">
@@ -456,7 +457,14 @@
                 </div>
                 <div class="example-caption">Ничья? Бот спросит про пенальти</div>
             </div>
+            
         </div>
+    </div>
+    
+    <!-- Стрелки (для десктопа) -->
+    <div class="carousel-controls">
+        <button class="carousel-btn" id="carouselPrev" aria-label="Назад">←</button>
+        <button class="carousel-btn" id="carouselNext" aria-label="Вперёд">→</button>
     </div>
 </section>
 
