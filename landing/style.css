@@ -231,7 +231,7 @@ h3 {
 .hero-buttons {
     display: flex;
     gap: 12px;
-    margin-bottom: 56px;
+    margin-bottom: 112px;
     flex-wrap: wrap;
 }
 
@@ -509,16 +509,44 @@ h3 {
 }
 
 /* ============================================================
-   EXAMPLES
+   EXAMPLES (карусель)
    ============================================================ */
 .examples {
     padding: 100px 0;
+    overflow: hidden;
 }
 
-.examples-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 32px;
+.examples .section-header {
+    padding: 0 24px;
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.examples-carousel {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: relative;
+}
+
+.examples-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.examples-track {
+    display: flex;
+    gap: 24px;
+    /* Выравнивание по контейнеру слева и справа */
+    padding-left: max(24px, calc((100vw - 1180px) / 2));
+    padding-right: max(24px, calc((100vw - 1180px) / 2));
+    padding-top: 8px;
+    padding-bottom: 24px;
+    width: max-content;
 }
 
 .example-phone {
@@ -526,21 +554,21 @@ h3 {
     flex-direction: column;
     align-items: center;
     gap: 16px;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    width: 260px;
 }
 
-/* Маленький айфон */
 .phone-frame-sm {
     width: 100%;
     max-width: 260px;
     background: #1c1c1e;
-    border-radius: 32px;
-    padding: 6px;
-    box-shadow:
-        0 20px 40px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(255, 255, 255, 0.06),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    padding: 6px 6px 0;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
     position: relative;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top-left-radius: 32px;
+    border-top-right-radius: 32px;
 }
 
 .example-phone:hover .phone-frame-sm {
@@ -556,24 +584,26 @@ h3 {
     height: 18px;
     background: #000;
     border-radius: 100px;
-    margin: 0 auto 4px;
-    position: relative;
     z-index: 2;
+    position: absolute;
+    left: 50%;
+    top: 16px;
+    transform: translateX(-50%);
 }
 
 .phone-screen-sm {
     background: var(--bg-2);
-    border-radius: 26px;
+    border-top-left-radius: 26px;
+    border-top-right-radius: 26px;
     overflow: hidden;
-    padding-bottom: 12px;
-    min-height: 360px;
+    min-height: 306px;
 }
 
 .chat-header-sm {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 40px 12px 12px;
     background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid var(--border);
 }
@@ -666,6 +696,42 @@ h3 {
     font-weight: 500;
 }
 
+/* Управление каруселью */
+.carousel-controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 0 24px;
+}
+
+.carousel-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.carousel-btn:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: scale(1.05);
+}
+
+.carousel-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
 /* ============================================================
    PRICING
    ============================================================ */
