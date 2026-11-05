@@ -545,9 +545,8 @@ h3 {
 .examples-track {
     display: flex;
     gap: 64px;
-    /* Выравнивание по контейнеру слева и справа */
-    padding-left: max(24px, calc((100vw - 1180px) / 2));
-    padding-right: max(24px, calc((100vw - 1180px) / 2));
+    padding-left: max(24px, calc((100vw - 1180px) / 2 + 24px));
+    padding-right: max(24px, calc((100vw - 1180px) / 2 + 24px));
     padding-top: 8px;
     padding-bottom: 8px;
     width: max-content;
