@@ -30,6 +30,7 @@ const bot = new TelegramBot(TOKEN, { polling: true });
 const TEAMS_FILE = path.join(__dirname, 'teams.json');
 const NATIONAL_TEAMS_FILE = path.join(__dirname, 'national_teams.json');
 const GLOBAL_STATS_FILE = path.join(__dirname, 'global_stats.json');
+const TOURNAMENTS_HISTORY_FILE = path.join(__dirname, 'tournaments_history.json');
 
 const userStates = new Map();
 const selectedParticipants = new Map();
@@ -46,12 +47,11 @@ const KNOWN_PARTICIPANTS = [
     { id: 'denis', name: 'Денис', username: 'DenisMosman' }
 ];
 
+// ============ ЗАГРУЗКА / СОХРАНЕНИЕ ============
+
 function loadTeams() {
-    try {
-        return JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
-    } catch (error) {
-        return [];
-    }
+    try { return JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8')); }
+    catch (e) { return []; }
 }
 
 function saveTeams(teams) {
@@ -59,24 +59,29 @@ function saveTeams(teams) {
 }
 
 function loadNationalTeams() {
-    try {
-        return JSON.parse(fs.readFileSync(NATIONAL_TEAMS_FILE, 'utf8'));
-    } catch (error) {
-        return [];
-    }
+    try { return JSON.parse(fs.readFileSync(NATIONAL_TEAMS_FILE, 'utf8')); }
+    catch (e) { return []; }
 }
 
 function loadGlobalStats() {
-    try {
-        return JSON.parse(fs.readFileSync(GLOBAL_STATS_FILE, 'utf8'));
-    } catch (error) {
-        return [];
-    }
+    try { return JSON.parse(fs.readFileSync(GLOBAL_STATS_FILE, 'utf8')); }
+    catch (e) { return []; }
 }
 
 function saveGlobalStats(stats) {
     fs.writeFileSync(GLOBAL_STATS_FILE, JSON.stringify(stats, null, 2));
 }
+
+function loadTournamentsHistory() {
+    try { return JSON.parse(fs.readFileSync(TOURNAMENTS_HISTORY_FILE, 'utf8')); }
+    catch (e) { return []; }
+}
+
+function saveTournamentsHistory(history) {
+    fs.writeFileSync(TOURNAMENTS_HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+// ============ ЗАПИСЬ МАТЧЕЙ ============
 
 function recordMatchToGlobalStats(match, participants, tournamentType) {
     const stats = loadGlobalStats();
@@ -98,6 +103,32 @@ function recordMatchToGlobalStats(match, participants, tournamentType) {
     stats.push(record);
     saveGlobalStats(stats);
 }
+
+// Запись завершенного турнира в историю
+function recordTournamentToHistory(tournament, winner) {
+    const history = loadTournamentsHistory();
+    
+    const record = {
+        date: new Date().toISOString(),
+        type: tournament.type, // 'club' или 'world_cup'
+        participants: tournament.participants.map(p => ({ name: p.name, team: p.team })),
+        winner: winner.name,
+        winnerTeam: winner.team,
+        winnerPoints: winner.points,
+        matches: tournament.matches.map(m => ({
+            player1: m.player1,
+            player2: m.player2,
+            score1: m.score1,
+            score2: m.score2,
+            penalties: m.penalties
+        }))
+    };
+    
+    history.push(record);
+    saveTournamentsHistory(history);
+}
+
+// ============ УТИЛИТЫ ============
 
 function shuffleArray(arr) {
     const shuffled = [...arr];
@@ -123,12 +154,12 @@ function saveMessageId(chatId, messageId) {
 
 async function deleteTournamentMessages() {
     for (const msg of tournamentMessages) {
-        try {
-            await bot.deleteMessage(msg.chatId, msg.messageId);
-        } catch (error) {}
+        try { await bot.deleteMessage(msg.chatId, msg.messageId); } catch (e) {}
     }
     tournamentMessages = [];
 }
+
+// ============ ГЕНЕРАЦИЯ РАСПИСАНИЯ ============
 
 function generateSchedule(participants) {
     const matches = [];
@@ -148,6 +179,8 @@ function generateSchedule(participants) {
     }
     return matches;
 }
+
+// ============ СТАТИСТИКА ТУРНИРА ============
 
 function calculateStats(participants, matches) {
     const stats = {};
@@ -190,14 +223,106 @@ function calculateStats(participants, matches) {
     return Object.values(stats);
 }
 
+// ============ СТАТИСТИКА ПО КОМАНДАМ ============
+
+function getTeamStats() {
+    const records = loadGlobalStats();
+    const teamStats = {};
+    
+    records.forEach(record => {
+        // Команда 1
+        if (record.team1) {
+            if (!teamStats[record.team1]) {
+                teamStats[record.team1] = { name: record.team1, matches: 0, wins: 0, losses: 0, draws: 0, goalsFor: 0, goalsAgainst: 0 };
+            }
+            teamStats[record.team1].matches++;
+            teamStats[record.team1].goalsFor += record.score1;
+            teamStats[record.team1].goalsAgainst += record.score2;
+            
+            if (record.penalties) {
+                if (record.penalties === record.player1) teamStats[record.team1].wins++;
+                else teamStats[record.team1].losses++;
+            } else if (record.score1 > record.score2) {
+                teamStats[record.team1].wins++;
+            } else if (record.score2 > record.score1) {
+                teamStats[record.team1].losses++;
+            } else {
+                teamStats[record.team1].draws++;
+            }
+        }
+        
+        // Команда 2
+        if (record.team2) {
+            if (!teamStats[record.team2]) {
+                teamStats[record.team2] = { name: record.team2, matches: 0, wins: 0, losses: 0, draws: 0, goalsFor: 0, goalsAgainst: 0 };
+            }
+            teamStats[record.team2].matches++;
+            teamStats[record.team2].goalsFor += record.score2;
+            teamStats[record.team2].goalsAgainst += record.score1;
+            
+            if (record.penalties) {
+                if (record.penalties === record.player2) teamStats[record.team2].wins++;
+                else teamStats[record.team2].losses++;
+            } else if (record.score2 > record.score1) {
+                teamStats[record.team2].wins++;
+            } else if (record.score1 > record.score2) {
+                teamStats[record.team2].losses++;
+            } else {
+                teamStats[record.team2].draws++;
+            }
+        }
+    });
+    
+    return Object.values(teamStats);
+}
+
+function formatTeamStats() {
+    const stats = getTeamStats();
+    
+    if (stats.length === 0) {
+        return '🏟️ <b>СТАТИСТИКА КОМАНД</b>\n\n❌ Пока нет сыгранных матчей!';
+    }
+    
+    // Сортировка: по % побед, затем по количеству матчей
+    const sorted = [...stats].sort((a, b) => {
+        const wrA = a.matches > 0 ? a.wins / a.matches : 0;
+        const wrB = b.matches > 0 ? b.wins / b.matches : 0;
+        if (wrA !== wrB) return wrB - wrA;
+        return b.matches - a.matches;
+    });
+    
+    let message = '🏟️ <b>СТАТИСТИКА КОМАНД</b>\n\n';
+    message += `<i>Всего команд в статистике: ${stats.length}</i>\n\n`;
+    
+    // Показываем топ-15
+    const top = sorted.slice(0, 15);
+    top.forEach((s, idx) => {
+        const winRate = s.matches > 0 ? ((s.wins / s.matches) * 100).toFixed(0) : 0;
+        const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
+        message += `${medal}<b>${s.name}</b>\n`;
+        message += `   🎮 ${s.matches} матчей · ✅ ${s.wins} (${winRate}%) · ❌ ${s.losses} · 🤝 ${s.draws}\n`;
+        message += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst}\n\n`;
+    });
+    
+    if (stats.length > 15) {
+        message += `<i>...и ещё ${stats.length - 15} команд</i>\n`;
+    }
+    
+    return message;
+}
+
+// ============ ОБЩИЙ РЕЙТИНГ ИГРОКОВ (с турнирами) ============
+
 function calculateGlobalStats() {
     const records = loadGlobalStats();
+    const tournaments = loadTournamentsHistory();
     const playerStats = {};
     
     KNOWN_PARTICIPANTS.forEach(p => {
         playerStats[p.name] = {
             name: p.name, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
-            penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
+            penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0,
+            tournamentsPlayed: 0, tournamentsWon: 0
         };
     });
     
@@ -205,13 +330,15 @@ function calculateGlobalStats() {
         if (!playerStats[record.player1]) {
             playerStats[record.player1] = {
                 name: record.player1, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
-                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
+                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0,
+                tournamentsPlayed: 0, tournamentsWon: 0
             };
         }
         if (!playerStats[record.player2]) {
             playerStats[record.player2] = {
                 name: record.player2, matchesPlayed: 0, wins: 0, losses: 0, draws: 0,
-                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0
+                penaltyWins: 0, penaltyLosses: 0, points: 0, goalsFor: 0, goalsAgainst: 0,
+                tournamentsPlayed: 0, tournamentsWon: 0
             };
         }
         
@@ -239,8 +366,45 @@ function calculateGlobalStats() {
         }
     });
     
+    // Считаем турниры
+    tournaments.forEach(tournament => {
+        tournament.participants.forEach(p => {
+            if (playerStats[p.name]) {
+                playerStats[p.name].tournamentsPlayed++;
+            }
+        });
+        if (playerStats[tournament.winner]) {
+            playerStats[tournament.winner].tournamentsWon++;
+        }
+    });
+    
     return Object.values(playerStats);
 }
+
+function getGlobalRatingTable() {
+    const stats = calculateGlobalStats();
+    const sorted = [...stats].sort((a, b) => {
+        if (a.points !== b.points) return b.points - a.points;
+        if (a.wins !== b.wins) return b.wins - a.wins;
+        const diffA = a.goalsFor - a.goalsAgainst;
+        const diffB = b.goalsFor - b.goalsAgainst;
+        return diffB - diffA;
+    });
+    
+    let table = '<b>📈 ОБЩИЙ РЕЙТИНГ ИГРОКОВ</b>\n\n';
+    sorted.forEach((s, idx) => {
+        const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
+        table += `${medal}<b>${s.name}</b> — ${s.points} очков\n`;
+        table += `   🎮 Матчей: ${s.matchesPlayed}\n`;
+        table += `   ✅ Побед: ${s.wins} | ❌ Поражений: ${s.losses} | 🤝 Ничьих: ${s.draws}\n`;
+        table += `   🥅 Пенальти: ${s.penaltyWins} / ${s.penaltyLosses}\n`;
+        table += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst} (${s.goalsFor - s.goalsAgainst >= 0 ? '+' : ''}${s.goalsFor - s.goalsAgainst})\n`;
+        table += `   🏆 Турниров: ${s.tournamentsWon} побед из ${s.tournamentsPlayed}\n\n`;
+    });
+    return table;
+}
+
+// ============ ЛИЧНЫЕ ВСТРЕЧИ ============
 
 function getHeadToHeadStats(player1Name, player2Name) {
     const records = loadGlobalStats();
@@ -259,22 +423,16 @@ function getHeadToHeadStats(player1Name, player2Name) {
     matches.forEach(m => {
         let scoreForP1, scoreForP2;
         if (m.player1 === player1Name) {
-            scoreForP1 = m.score1;
-            scoreForP2 = m.score2;
+            scoreForP1 = m.score1; scoreForP2 = m.score2;
         } else {
-            scoreForP1 = m.score2;
-            scoreForP2 = m.score1;
+            scoreForP1 = m.score2; scoreForP2 = m.score1;
         }
         
-        p1Goals += scoreForP1;
-        p2Goals += scoreForP2;
+        p1Goals += scoreForP1; p2Goals += scoreForP2;
         
         if (m.penalties) {
-            if (m.penalties === player1Name) {
-                p1Wins++; p1PenaltyWins++;
-            } else {
-                p2Wins++; p2PenaltyWins++;
-            }
+            if (m.penalties === player1Name) { p1Wins++; p1PenaltyWins++; }
+            else { p2Wins++; p2PenaltyWins++; }
         } else if (scoreForP1 > scoreForP2) {
             p1Wins++;
         } else if (scoreForP2 > scoreForP1) {
@@ -284,22 +442,16 @@ function getHeadToHeadStats(player1Name, player2Name) {
         }
         
         recentMatches.push({
-            date: m.date,
-            player1: m.player1,
-            player2: m.player2,
-            score1: m.score1,
-            score2: m.score2,
-            penalties: m.penalties
+            date: m.date, player1: m.player1, player2: m.player2,
+            score1: m.score1, score2: m.score2, penalties: m.penalties
         });
     });
     
     recentMatches.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     return {
-        totalMatches: matches.length,
-        p1Wins, p2Wins, draws,
-        p1PenaltyWins, p2PenaltyWins,
-        p1Goals, p2Goals,
+        totalMatches: matches.length, p1Wins, p2Wins, draws,
+        p1PenaltyWins, p2PenaltyWins, p1Goals, p2Goals,
         recentMatches: recentMatches.slice(0, 5)
     };
 }
@@ -337,11 +489,8 @@ function formatHeadToHead(player1Name, player2Name, stats) {
             resultEmoji = m.penalties === player1Name ? '✅' : '❌';
         } else {
             let s1, s2;
-            if (m.player1 === player1Name) {
-                s1 = m.score1; s2 = m.score2;
-            } else {
-                s1 = m.score2; s2 = m.score1;
-            }
+            if (m.player1 === player1Name) { s1 = m.score1; s2 = m.score2; }
+            else { s1 = m.score2; s2 = m.score1; }
             if (s1 > s2) resultEmoji = '✅';
             else if (s2 > s1) resultEmoji = '❌';
         }
@@ -353,6 +502,8 @@ function formatHeadToHead(player1Name, player2Name, stats) {
     
     return message;
 }
+
+// ============ ОСТАЛЬНОЕ ============
 
 function getStandingsTable(stats) {
     const sorted = [...stats].sort((a, b) => {
@@ -370,28 +521,6 @@ function getStandingsTable(stats) {
         const diffText = diff >= 0 ? `+${diff}` : `${diff}`;
         table += `${medal}${s.name} (${s.team})\n`;
         table += `   ${s.matchesPlayed} игр · ${s.points} очков · голы ${s.goalsFor}:${s.goalsAgainst} (${diffText})\n\n`;
-    });
-    return table;
-}
-
-function getGlobalRatingTable() {
-    const stats = calculateGlobalStats();
-    const sorted = [...stats].sort((a, b) => {
-        if (a.points !== b.points) return b.points - a.points;
-        if (a.wins !== b.wins) return b.wins - a.wins;
-        const diffA = a.goalsFor - a.goalsAgainst;
-        const diffB = b.goalsFor - b.goalsAgainst;
-        return diffB - diffA;
-    });
-    
-    let table = '<b>📈 ОБЩИЙ РЕЙТИНГ ИГРОКОВ</b>\n\n';
-    sorted.forEach((s, idx) => {
-        const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
-        table += `${medal}<b>${s.name}</b> — ${s.points} очков\n`;
-        table += `   🎮 Матчей: ${s.matchesPlayed}\n`;
-        table += `   ✅ Побед: ${s.wins} | ❌ Поражений: ${s.losses} | 🤝 Ничьих: ${s.draws}\n`;
-        table += `   🥅 Пенальти: ${s.penaltyWins} / ${s.penaltyLosses}\n`;
-        table += `   ⚽️ Голы: ${s.goalsFor}:${s.goalsAgainst} (${s.goalsFor - s.goalsAgainst >= 0 ? '+' : ''}${s.goalsFor - s.goalsAgainst})\n\n`;
     });
     return table;
 }
@@ -424,7 +553,7 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     const keyboard = [
         [{ text: '🏆 Новый турнир' }, { text: '📋 Список команд' }],
         [{ text: '📈 Общий рейтинг' }, { text: '⚔️ Личные встречи' }],
-        [{ text: '❓ Помощь' }]
+        [{ text: '🏟️ Статистика команд' }, { text: '❓ Помощь' }]
     ];
     
     if (isAdminUser) {
@@ -499,6 +628,8 @@ function createH2HSecondPlayerKeyboard(firstPlayerName) {
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
+// ============ КОМАНДЫ БОТА ============
+
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -516,7 +647,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     const messageId = callbackQuery.message.message_id;
     
-    // H2H - выбор первого
+    // H2H
     if (data.startsWith('h2h_first_')) {
         const firstPlayer = data.replace('h2h_first_', '');
         await bot.editMessageText(
@@ -528,32 +659,24 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
     }
     
-    // H2H - выбор второго
     if (data.startsWith('h2h_second_')) {
         const rest = data.replace('h2h_second_', '');
         const [firstPlayer, secondPlayer] = rest.split('__');
-        
         const stats = getHeadToHeadStats(firstPlayer, secondPlayer);
         const message = formatHeadToHead(firstPlayer, secondPlayer, stats);
-        
-        await bot.editMessageText(message, {
-            chat_id: chatId, message_id: messageId, parse_mode: 'HTML'
-        });
+        await bot.editMessageText(message, { chat_id: chatId, message_id: messageId, parse_mode: 'HTML' });
         saveMessageId(chatId, messageId);
         await bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
     
-    // H2H - отмена
     if (data === 'h2h_cancel') {
-        await bot.editMessageText('❌ Личные встречи отменены', {
-            chat_id: chatId, message_id: messageId
-        });
+        await bot.editMessageText('❌ Личные встречи отменены', { chat_id: chatId, message_id: messageId });
         await bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
     
-    // Обработка турнира
+    // Турнир
     if (data.startsWith('tournament_toggle_')) {
         const participantId = data.replace('tournament_toggle_', '');
         const selectionKey = `tournament_${chatId}`;
@@ -847,6 +970,12 @@ bot.on('message', async (msg) => {
             saveMessageId(chatId, hMsg.message_id);
             break;
             
+        case '🏟️ Статистика команд':
+            const teamStats = formatTeamStats();
+            const tsMsg = await bot.sendMessage(chatId, teamStats, { parse_mode: 'HTML' });
+            saveMessageId(chatId, tsMsg.message_id);
+            break;
+            
         case '✏️ Записать результат':
             if (!currentTournament) {
                 bot.sendMessage(chatId, '❌ Нет турнира!');
@@ -900,6 +1029,9 @@ bot.on('message', async (msg) => {
             });
             const winner = sorted[0];
             
+            // Записываем турнир в историю
+            recordTournamentToHistory(currentTournament, winner);
+            
             let fMsg = `<b>🏆 ТУРНИР ЗАВЕРШЕН!</b>\n\n<b>ПОБЕДИТЕЛЬ:</b> ${winner.name} (${winner.team}) — ${winner.points} очков\n\n<b>ИТОГОВАЯ ТАБЛИЦА:</b>\n`;
             sorted.forEach((s, i) => {
                 const m = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
@@ -948,7 +1080,7 @@ bot.on('message', async (msg) => {
         case '❓ Помощь':
             const help = currentTournament ?
                 `<b>🎯 ТУРНИР ИДЕТ</b>\n\n✏️ Записать — счет\n📊 Таблица\n✏️ Редактировать\n🏆 Завершить\n⚠️ Прервать` :
-                `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n\n<b>Для админов:</b>\n➕ Добавить команду\n❌ Удалить команду`;
+                `<b>🎯 Турнирный бот</b>\n\n🏆 Новый турнир\n📋 Список команд\n📈 Общий рейтинг\n⚔️ Личные встречи\n🏟️ Статистика команд\n\n<b>Для админов:</b>\n➕ Добавить команду\n❌ Удалить команду`;
             const hM = await bot.sendMessage(chatId, help, { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) });
             saveMessageId(chatId, hM.message_id);
             break;
