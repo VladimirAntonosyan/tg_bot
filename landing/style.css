@@ -767,6 +767,40 @@ h3 {
     background: var(--bg-2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Mesh-градиент: бирюзовое + фиолетовое пятна */
+.pricing::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 600px 400px at 20% 30%, rgba(34, 211, 238, 0.15), transparent 70%),
+        radial-gradient(ellipse 500px 400px at 80% 70%, rgba(167, 139, 250, 0.12), transparent 70%),
+        radial-gradient(ellipse 400px 300px at 50% 100%, rgba(34, 211, 238, 0.08), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Лёгкий градиент сверху и снизу — плавный переход */
+.pricing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, var(--bg) 0%, transparent 15%),
+        linear-gradient(0deg, var(--bg) 0%, transparent 15%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Контент поверх фона */
+.pricing .container {
+    position: relative;
+    z-index: 1;
 }
 
 .pricing-grid {
