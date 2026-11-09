@@ -1133,7 +1133,7 @@ h3 {
 
 .cookie-text a {
     color: var(--text);
-    text-decoration: underline;
+    text-decoration: none;
 }
 
 .cookie-text a:hover {
@@ -1170,6 +1170,7 @@ h3 {
 
 .cookie-btn-decline {
     color: var(--text-muted);
+    background-color: transparent;
 }
 
 .cookie-btn-decline:hover {
