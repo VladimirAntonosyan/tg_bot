@@ -68,11 +68,21 @@ async function initDatabase() {
                 amount INTEGER
             );
             
+            CREATE TABLE IF NOT EXISTS pending_payments (
+                payment_id TEXT PRIMARY KEY,
+                chat_id BIGINT NOT NULL,
+                amount INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
             CREATE INDEX IF NOT EXISTS idx_clubs_chat_id ON clubs(chat_id);
             CREATE INDEX IF NOT EXISTS idx_national_teams_chat_id ON national_teams(chat_id);
             CREATE INDEX IF NOT EXISTS idx_matches_chat_id ON matches(chat_id);
             CREATE INDEX IF NOT EXISTS idx_tournaments_chat_id ON tournaments(chat_id);
             CREATE INDEX IF NOT EXISTS idx_participants_chat_id ON participants(chat_id);
+            CREATE INDEX IF NOT EXISTS idx_pending_payments_chat ON pending_payments(chat_id);
+            CREATE INDEX IF NOT EXISTS idx_pending_payments_status ON pending_payments(status);
         `);
         console.log('✅ База данных инициализирована');
     } catch (error) {
@@ -81,7 +91,7 @@ async function initDatabase() {
     }
 }
 
-// ============ УЧАСТНИКИ (participants) ============
+// ============ УЧАСТНИКИ ============
 
 async function getParticipants(chatId) {
     const result = await pool.query(
@@ -103,7 +113,7 @@ async function addParticipant(chatId, participantId, name, username = null) {
         );
         return true;
     } catch (error) {
-        if (error.code === '23505') return false; // уже есть
+        if (error.code === '23505') return false;
         throw error;
     }
 }
@@ -143,7 +153,7 @@ async function addClub(chatId, name) {
         await pool.query('INSERT INTO clubs (chat_id, name) VALUES ($1, $2)', [chatId, name]);
         return true;
     } catch (error) {
-        if (error.code === '23505') return false; // уже есть
+        if (error.code === '23505') return false;
         throw error;
     }
 }
@@ -157,7 +167,6 @@ async function removeClub(chatId, name) {
 }
 
 async function setClubs(chatId, names) {
-    // Используется при онбординге
     await pool.query('DELETE FROM clubs WHERE chat_id = $1', [chatId]);
     for (const name of names) {
         await pool.query(
@@ -177,22 +186,12 @@ async function getNationalTeams(chatId) {
     return result.rows.map(r => r.name);
 }
 
-async function setNationalTeams(chatId, names) {
-    await pool.query('DELETE FROM national_teams WHERE chat_id = $1', [chatId]);
-    for (const name of names) {
-        await pool.query(
-            'INSERT INTO national_teams (chat_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [chatId, name]
-        );
-    }
-}
-
 async function addNationalTeam(chatId, name) {
     try {
         await pool.query('INSERT INTO national_teams (chat_id, name) VALUES ($1, $2)', [chatId, name]);
         return true;
     } catch (error) {
-        if (error.code === '23505') return false; // уже есть
+        if (error.code === '23505') return false;
         throw error;
     }
 }
@@ -205,12 +204,22 @@ async function removeNationalTeam(chatId, name) {
     return result.rowCount > 0;
 }
 
+async function setNationalTeams(chatId, names) {
+    await pool.query('DELETE FROM national_teams WHERE chat_id = $1', [chatId]);
+    for (const name of names) {
+        await pool.query(
+            'INSERT INTO national_teams (chat_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [chatId, name]
+        );
+    }
+}
+
 // ============ МАТЧИ ============
 
 async function recordMatch(chatId, match, participants, tournamentType) {
     const player1Data = participants.find(p => p.name === match.player1);
     const player2Data = participants.find(p => p.name === match.player2);
-    
+
     await pool.query(
         `INSERT INTO matches (chat_id, date, tournament_type, player1, player2, team1, team2, score1, score2, penalties)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -290,7 +299,7 @@ async function getTournamentCount(chatId) {
     return parseInt(result.rows[0].count);
 }
 
-// ============ ПОДПИСКИ (для будущей монетизации) ============
+// ============ ПОДПИСКИ ============
 
 async function getSubscription(chatId) {
     const result = await pool.query(
@@ -314,6 +323,56 @@ async function setSubscription(chatId, tier, paymentId = null, amount = null) {
     );
 }
 
+// ============ ПЛАТЕЖИ ============
+
+async function savePendingPayment(paymentId, chatId, amount) {
+    await pool.query(
+        `INSERT INTO pending_payments (payment_id, chat_id, amount, status)
+         VALUES ($1, $2, $3, 'pending')
+         ON CONFLICT (payment_id) DO NOTHING`,
+        [paymentId, chatId, amount]
+    );
+}
+
+async function getPendingPayment(paymentId) {
+    const result = await pool.query(
+        'SELECT * FROM pending_payments WHERE payment_id = $1',
+        [paymentId]
+    );
+    return result.rows[0] || null;
+}
+
+async function getPendingPaymentsByChat(chatId) {
+    const result = await pool.query(
+        `SELECT * FROM pending_payments 
+         WHERE chat_id = $1 AND status = 'pending'
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [chatId]
+    );
+    return result.rows;
+}
+
+async function updatePaymentStatus(paymentId, status) {
+    await pool.query(
+        'UPDATE pending_payments SET status = $1 WHERE payment_id = $2',
+        [status, paymentId]
+    );
+}
+
+async function getUserSubscriptions(userId) {
+    const result = await pool.query(
+        `SELECT s.*, p.name as chat_name 
+         FROM subscriptions s
+         LEFT JOIN chats p ON s.chat_id = p.chat_id
+         WHERE s.purchased_by = $1`,
+        [userId]
+    );
+    return result.rows;
+}
+
+// ============ УТИЛИТЫ ============
+
 async function isDatabaseEmpty(chatId) {
     const result = await pool.query(
         'SELECT COUNT(*) FROM clubs WHERE chat_id = $1',
@@ -322,20 +381,38 @@ async function isDatabaseEmpty(chatId) {
     return parseInt(result.rows[0].count) === 0;
 }
 
+async function closePool() {
+    await pool.end();
+}
+
+// ============ ЭКСПОРТ ============
+
 module.exports = {
+    // Init
     initDatabase,
+    closePool,
+
     // Participants
     getParticipants, addParticipant, removeParticipant, clearParticipants, hasParticipants,
+
     // Clubs
     getClubs, addClub, removeClub, setClubs,
+
     // National teams
-    getNationalTeams, setNationalTeams, addNationalTeam, removeNationalTeam,
+    getNationalTeams, addNationalTeam, removeNationalTeam, setNationalTeams,
+
     // Matches
     recordMatch, getAllMatches,
+
     // Tournaments
     recordTournament, getAllTournaments, getTournamentCount,
+
     // Subscriptions
     getSubscription, setSubscription,
+
+    // Payments
+    savePendingPayment, getPendingPayment, getPendingPaymentsByChat, updatePaymentStatus,
+
     // Utils
     isDatabaseEmpty
 };
