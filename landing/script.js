@@ -548,3 +548,49 @@ initDragCarousel('.features-carousel');
         });
     }
 })();
+
+// ============================================================
+// COOKIE BANNER
+// ============================================================
+(function() {
+    const banner = document.getElementById('cookieBanner');
+    const acceptBtn = document.getElementById('cookieAccept');
+    const declineBtn = document.getElementById('cookieDecline');
+    
+    if (!banner) return;
+    
+    const COOKIE_KEY = 'cookie_consent';
+    const COOKIE_VERSION = 'v1'; // если изменишь текст — подними версию
+    
+    // Проверяем, принял ли пользователь
+    const consent = localStorage.getItem(COOKIE_KEY);
+    
+    if (!consent || JSON.parse(consent).version !== COOKIE_VERSION) {
+        // Показываем баннер через 1 секунду (чтобы не сразу при загрузке)
+        setTimeout(() => {
+            banner.style.display = 'block';
+        }, 1000);
+    }
+    
+    // Принять
+    acceptBtn.addEventListener('click', () => {
+        localStorage.setItem(COOKIE_KEY, JSON.stringify({
+            version: COOKIE_VERSION,
+            accepted: true,
+            date: new Date().toISOString()
+        }));
+        banner.style.animation = 'cookieSlideUp 0.3s ease-in reverse';
+        setTimeout(() => { banner.style.display = 'none'; }, 300);
+    });
+    
+    // Отклонить
+    declineBtn.addEventListener('click', () => {
+        localStorage.setItem(COOKIE_KEY, JSON.stringify({
+            version: COOKIE_VERSION,
+            accepted: false,
+            date: new Date().toISOString()
+        }));
+        banner.style.animation = 'cookieSlideUp 0.3s ease-in reverse';
+        setTimeout(() => { banner.style.display = 'none'; }, 300);
+    });
+})();
