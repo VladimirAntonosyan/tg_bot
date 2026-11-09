@@ -1081,6 +1081,103 @@ h3 {
     font-size: 0.82rem;
 }
 
+
+/* ============================================================
+   COOKIE BANNER
+   ============================================================ */
+.cookie-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding: 16px 24px;
+    background: rgba(20, 25, 38, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+    animation: cookieSlideUp 0.4s ease-out;
+}
+
+@keyframes cookieSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.cookie-content {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.cookie-text {
+    flex: 1;
+    min-width: 250px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.cookie-text a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.cookie-text a:hover {
+    color: var(--accent-2);
+}
+
+.cookie-buttons {
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.cookie-btn {
+    padding: 10px 24px;
+    border-radius: 100px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    white-space: nowrap;
+}
+
+.cookie-btn-accept {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0a0d14;
+}
+
+.cookie-btn-accept:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(34, 211, 238, 0.4);
+}
+
+.cookie-btn-decline {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-hover);
+}
+
+.cookie-btn-decline:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+}
+
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -1193,4 +1290,27 @@ h3 {
     .feature-card-inner {
        padding: 20px;
    }
+
+    .cookie-banner {
+        padding: 16px 16px 20px;
+    }
+    
+    .cookie-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+    
+    .cookie-text {
+        font-size: 0.82rem;
+    }
+    
+    .cookie-buttons {
+        width: 100%;
+    }
+    
+    .cookie-btn {
+        flex: 1;
+        padding: 12px 16px;
+    }
 }
