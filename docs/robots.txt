@@ -1,0 +1,18 @@
+# ============================================================
+# robots.txt для tournamentbot.ru
+# ============================================================
+
+# Разрешаем индексировать всё
+User-agent: *
+Allow: /
+
+# Закрываем юридические страницы от индексации
+Disallow: /offer.html
+Disallow: /privacy.html
+
+# Закрываем служебные файлы
+Disallow: /*.json$
+Disallow: /manifest.json
+
+# Указываем карту сайта
+Sitemap: https://tournamentbot.ru/sitemap.xml
