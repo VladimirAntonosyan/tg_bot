@@ -1307,10 +1307,17 @@ h3 {
     
     .cookie-buttons {
         width: 100%;
+        gap: 16px;
     }
     
     .cookie-btn {
         flex: 1;
         padding: 12px 16px;
     }
+
+    .cookie-btn-decline {
+        border: 1px solid var(--border);
+    }
+
+    
 }
