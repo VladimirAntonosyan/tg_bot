@@ -241,17 +241,14 @@ async function sendWelcomeScreen(chatId, user) {
     const keyboard = {
         inline_keyboard: [
             [
-                {
-                    text: '➕ Добавить в групповой чат',
-                    url: `https://t.me/${BOT_USERNAME}?startgroup=true`
+                { 
+                    text: '➕ Добавить в групповой чат', 
+                    url: `https://t.me/${BOT_USERNAME}?startgroup=true` 
                 }
             ],
             [
                 { text: '💎 Что такое PRO?', callback_data: 'welcome_premium' },
                 { text: '❓ Как это работает?', callback_data: 'welcome_how' }
-            ],
-            [
-                { text: '🌐 Сайт бота', url: 'https://vladimirantonosyan.github.io/tg_bot/landing/' }
             ]
         ]
     };
