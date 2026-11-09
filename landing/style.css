@@ -1086,18 +1086,20 @@ h3 {
    COOKIE BANNER
    ============================================================ */
 .cookie-banner {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    display: block;
+    left: auto;
+    bottom: 20px;
+    right: 24px;
+    max-width: calc(100% - 48px);
+    border-radius: 24px;
+    background: rgba(20, 25, 38, 0.55);
     z-index: 9999;
-    padding: 16px 24px;
-    background: rgba(20, 25, 38, 0.95);
     backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    box-shadow: rgba(0, 0, 0, 0.3) 0px -10px 40px;
+    padding: 16px 24px;
+    position: fixed;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
-    animation: cookieSlideUp 0.4s ease-out;
+    animation: 0.4s ease-out 0s 1 normal none running cookieSlideUp;
 }
 
 @keyframes cookieSlideUp {
@@ -1130,17 +1132,17 @@ h3 {
 }
 
 .cookie-text a {
-    color: var(--accent);
+    color: var(--text);
     text-decoration: underline;
 }
 
 .cookie-text a:hover {
-    color: var(--accent-2);
+    color: var(--accent);
 }
 
 .cookie-buttons {
     display: flex;
-    gap: 12px;
+    gap: 2px;
     flex-shrink: 0;
 }
 
@@ -1157,23 +1159,20 @@ h3 {
 }
 
 .cookie-btn-accept {
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: #0a0d14;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
 }
 
 .cookie-btn-accept:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(34, 211, 238, 0.4);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
 }
 
 .cookie-btn-decline {
-    background: transparent;
     color: var(--text-muted);
-    border: 1px solid var(--border-hover);
 }
 
 .cookie-btn-decline:hover {
-    background: rgba(255, 255, 255, 0.05);
     color: var(--text);
 }
 
