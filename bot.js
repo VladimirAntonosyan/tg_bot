@@ -249,6 +249,9 @@ async function sendWelcomeScreen(chatId, user) {
             [
                 { text: '💎 Что такое PRO?', callback_data: 'welcome_premium' },
                 { text: '❓ Как это работает?', callback_data: 'welcome_how' }
+            ],
+            [
+                { text: '🌐 Сайт бота', url: 'https://tournamentbot.ru/' }
             ]
         ]
     };
