@@ -1127,8 +1127,10 @@ h3 {
     flex: 1;
     min-width: 250px;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 14px;
     line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .cookie-text a {
@@ -1302,12 +1304,14 @@ h3 {
     }
     
     .cookie-text {
-        font-size: 0.82rem;
+        font-size: 13px;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
     }
     
     .cookie-buttons {
         width: 100%;
-        gap: 16px;
+        gap: 8px;
     }
     
     .cookie-btn {
