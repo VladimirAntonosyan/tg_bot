@@ -8,7 +8,7 @@ const db = require('./db');
 const { createPayment, getPayment } = require('./payment');
 
 // ============ КОНСТАНТЫ ============
-const BOT_USERNAME = 'fc26avangard_bot';
+const BOT_USERNAME = 'FcTourBot';
 
 // ============ HEALTH CHECK + WEBHOOK ============
 const server = http.createServer(async (req, res) => {
