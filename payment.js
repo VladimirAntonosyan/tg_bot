@@ -3,7 +3,7 @@ const { randomUUID } = require('crypto');
 
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
-const RETURN_URL = process.env.YOOKASSA_RETURN_URL || 'https://t.me/fc26avangard_bot';
+const RETURN_URL = process.env.YOOKASSA_RETURN_URL || 'https://t.me/FcTourBot';
 
 const API_URL = 'https://api.yookassa.ru/v3';
 const AUTH = Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64');
