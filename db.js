@@ -16,17 +16,18 @@ async function initDatabase() {
                 name TEXT NOT NULL,
                 UNIQUE(chat_id, name)
             );
-            
+
             CREATE TABLE IF NOT EXISTS national_teams (
                 id SERIAL PRIMARY KEY,
                 chat_id BIGINT NOT NULL,
                 name TEXT NOT NULL,
                 UNIQUE(chat_id, name)
             );
-            
+
             CREATE TABLE IF NOT EXISTS matches (
                 id SERIAL PRIMARY KEY,
                 chat_id BIGINT NOT NULL,
+                match_id INTEGER,
                 date TIMESTAMP NOT NULL,
                 tournament_type TEXT NOT NULL,
                 player1 TEXT NOT NULL,
@@ -37,7 +38,7 @@ async function initDatabase() {
                 score2 INTEGER NOT NULL,
                 penalties TEXT
             );
-            
+
             CREATE TABLE IF NOT EXISTS tournaments (
                 id SERIAL PRIMARY KEY,
                 chat_id BIGINT NOT NULL,
@@ -49,7 +50,7 @@ async function initDatabase() {
                 participants TEXT,
                 matches TEXT
             );
-            
+
             CREATE TABLE IF NOT EXISTS participants (
                 id SERIAL PRIMARY KEY,
                 chat_id BIGINT NOT NULL,
@@ -59,7 +60,7 @@ async function initDatabase() {
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(chat_id, participant_id)
             );
-            
+
             CREATE TABLE IF NOT EXISTS subscriptions (
                 chat_id BIGINT PRIMARY KEY,
                 tier TEXT DEFAULT 'free',
@@ -67,7 +68,7 @@ async function initDatabase() {
                 payment_id TEXT,
                 amount INTEGER
             );
-            
+
             CREATE TABLE IF NOT EXISTS pending_payments (
                 payment_id TEXT PRIMARY KEY,
                 chat_id BIGINT NOT NULL,
@@ -75,7 +76,7 @@ async function initDatabase() {
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT NOW()
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_clubs_chat_id ON clubs(chat_id);
             CREATE INDEX IF NOT EXISTS idx_national_teams_chat_id ON national_teams(chat_id);
             CREATE INDEX IF NOT EXISTS idx_matches_chat_id ON matches(chat_id);
@@ -83,6 +84,9 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_participants_chat_id ON participants(chat_id);
             CREATE INDEX IF NOT EXISTS idx_pending_payments_chat ON pending_payments(chat_id);
             CREATE INDEX IF NOT EXISTS idx_pending_payments_status ON pending_payments(status);
+
+            -- 🔧 миграция: добавляем match_id, если таблица уже существовала без него
+            ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_id INTEGER;
         `);
         console.log('✅ База данных инициализирована');
     } catch (error) {
@@ -167,12 +171,27 @@ async function removeClub(chatId, name) {
 }
 
 async function setClubs(chatId, names) {
-    await pool.query('DELETE FROM clubs WHERE chat_id = $1', [chatId]);
-    for (const name of names) {
-        await pool.query(
-            'INSERT INTO clubs (chat_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [chatId, name]
-        );
+    // 🔧 фикс: батч-вставка вместо N запросов
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM clubs WHERE chat_id = $1', [chatId]);
+
+        if (names.length > 0) {
+            const values = names.map((_, i) => `($1, $${i + 2})`).join(',');
+            const params = [chatId, ...names];
+            await client.query(
+                `INSERT INTO clubs (chat_id, name) VALUES ${values} ON CONFLICT DO NOTHING`,
+                params
+            );
+        }
+
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
     }
 }
 
@@ -205,12 +224,27 @@ async function removeNationalTeam(chatId, name) {
 }
 
 async function setNationalTeams(chatId, names) {
-    await pool.query('DELETE FROM national_teams WHERE chat_id = $1', [chatId]);
-    for (const name of names) {
-        await pool.query(
-            'INSERT INTO national_teams (chat_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [chatId, name]
-        );
+    // 🔧 фикс: батч-вставка
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM national_teams WHERE chat_id = $1', [chatId]);
+
+        if (names.length > 0) {
+            const values = names.map((_, i) => `($1, $${i + 2})`).join(',');
+            const params = [chatId, ...names];
+            await client.query(
+                `INSERT INTO national_teams (chat_id, name) VALUES ${values} ON CONFLICT DO NOTHING`,
+                params
+            );
+        }
+
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
     }
 }
 
@@ -221,10 +255,11 @@ async function recordMatch(chatId, match, participants, tournamentType) {
     const player2Data = participants.find(p => p.name === match.player2);
 
     await pool.query(
-        `INSERT INTO matches (chat_id, date, tournament_type, player1, player2, team1, team2, score1, score2, penalties)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO matches (chat_id, match_id, date, tournament_type, player1, player2, team1, team2, score1, score2, penalties)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
             chatId,
+            match.id ?? null,
             new Date().toISOString(),
             tournamentType,
             match.player1,
@@ -238,12 +273,34 @@ async function recordMatch(chatId, match, participants, tournamentType) {
     );
 }
 
+/**
+ * 🔧 НОВОЕ: обновление матча при редактировании.
+ * Ищем последнюю запись по (chat_id, player1, player2) и перезаписываем счёт/пенальти.
+ * Так избегаем дублирования статистики.
+ */
+async function updateMatch(chatId, match) {
+    const result = await pool.query(
+        `UPDATE matches
+         SET score1 = $1, score2 = $2, penalties = $3
+         WHERE id = (
+             SELECT id FROM matches
+             WHERE chat_id = $4 AND player1 = $5 AND player2 = $6
+             ORDER BY date DESC
+             LIMIT 1
+         )`,
+        [match.score1, match.score2, match.penalties, chatId, match.player1, match.player2]
+    );
+    return result.rowCount > 0;
+}
+
 async function getAllMatches(chatId) {
     const result = await pool.query(
         'SELECT * FROM matches WHERE chat_id = $1 ORDER BY date ASC',
         [chatId]
     );
     return result.rows.map(r => ({
+        id: r.match_id,                 // 🔧 match_id из турнира (может быть null у старых записей)
+        dbId: r.id,                     // SERIAL id — на всякий случай
         date: r.date,
         tournamentType: r.tournament_type,
         player1: r.player1,
@@ -344,7 +401,7 @@ async function getPendingPayment(paymentId) {
 
 async function getPendingPaymentsByChat(chatId) {
     const result = await pool.query(
-        `SELECT * FROM pending_payments 
+        `SELECT * FROM pending_payments
          WHERE chat_id = $1 AND status = 'pending'
          ORDER BY created_at DESC
          LIMIT 5`,
@@ -358,17 +415,6 @@ async function updatePaymentStatus(paymentId, status) {
         'UPDATE pending_payments SET status = $1 WHERE payment_id = $2',
         [status, paymentId]
     );
-}
-
-async function getUserSubscriptions(userId) {
-    const result = await pool.query(
-        `SELECT s.*, p.name as chat_name 
-         FROM subscriptions s
-         LEFT JOIN chats p ON s.chat_id = p.chat_id
-         WHERE s.purchased_by = $1`,
-        [userId]
-    );
-    return result.rows;
 }
 
 // ============ УТИЛИТЫ ============
@@ -402,7 +448,7 @@ module.exports = {
     getNationalTeams, addNationalTeam, removeNationalTeam, setNationalTeams,
 
     // Matches
-    recordMatch, getAllMatches,
+    recordMatch, updateMatch, getAllMatches,
 
     // Tournaments
     recordTournament, getAllTournaments, getTournamentCount,
