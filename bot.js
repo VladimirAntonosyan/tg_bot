@@ -85,7 +85,7 @@ const server = http.createServer(async (req, res) => {
                 res.writeHead(200);
                 res.end('OK');
             } catch (error) {
-                console.error('❌ Webhook error:', error);
+                console.error('❌ Webhook error:', error?.message || error);
                 res.writeHead(500);
                 res.end('Error');
             }
@@ -145,7 +145,7 @@ async function initializeBot() {
                 console.log(`✅ Загружено ${DEFAULT_CLUBS.length} клубов (дефолтные)`);
             }
         } catch (e) {
-            console.error('Ошибка загрузки teams.json:', e);
+            console.error('Ошибка загрузки teams.json:', e?.message || e);
         }
         
         try {
@@ -155,14 +155,14 @@ async function initializeBot() {
                 console.log(`✅ Загружено ${DEFAULT_NATIONAL_TEAMS.length} сборных (дефолтные)`);
             }
         } catch (e) {
-            console.error('Ошибка загрузки national_teams.json:', e);
+            console.error('Ошибка загрузки national_teams.json:', e?.message || e);
         }
         
         await db.initDatabase();
         console.log('✅ База данных готова');
         console.log('🤖 Бот запущен!');
     } catch (error) {
-        console.error('❌ Ошибка инициализации:', error);
+        console.error('❌ Ошибка инициализации:', error?.message || error);
         process.exit(1);
     }
 }
@@ -222,7 +222,7 @@ function generateParticipantId(name, existingIds = []) {
     return id;
 }
 
-// ============ ОБРАБОТКА ВВОДА СЧЁТА (вынесено отдельно) ============
+// ============ ОБРАБОТКА ВВОДА СЧЁТА ============
 
 async function handleScoreInput(chatId, userId, text) {
     const state = userStates.get(userId);
@@ -248,7 +248,6 @@ async function handleScoreInput(chatId, userId, text) {
         return true;
     }
     
-    // Если matchId не указан — ищем единственный незавершённый матч
     let matchId = state.matchId;
     if (!matchId) {
         const incomplete = currentTournament.matches.filter(m => !m.completed);
@@ -258,7 +257,6 @@ async function handleScoreInput(chatId, userId, text) {
             return true;
         }
         if (incomplete.length > 1) {
-            // Спрашиваем, к какому матчу
             const keyboard = {
                 reply_markup: {
                     inline_keyboard: incomplete.map(m => [{
@@ -283,7 +281,8 @@ async function handleScoreInput(chatId, userId, text) {
         return true;
     }
     
-    if (tournamentMatch.completed) {
+    // ✅ ИСПРАВЛЕНИЕ: Проверяем завершённость ТОЛЬКО для новых матчей, НЕ для редактирования
+    if (tournamentMatch.completed && state.action !== 'editing_score') {
         userStates.delete(userId);
         await bot.sendMessage(chatId, '⚠️ Этот матч уже завершён. Выбери другой.');
         return true;
@@ -1218,7 +1217,7 @@ async function checkPendingPayments(chatId) {
                 await db.updatePaymentStatus(payment.payment_id, 'canceled');
             }
         } catch (error) {
-            console.error(`Ошибка проверки платежа ${payment.payment_id}:`, error.message);
+            console.error(`Ошибка проверки платежа ${payment.payment_id}:`, error?.message || error);
         }
     }
     
@@ -1250,7 +1249,7 @@ bot.onText(/\/start/, async (msg) => {
             { parse_mode: 'HTML', ...getMainKeyboard(isAdminUser, !!currentTournament) }
         );
     } catch (error) {
-        console.error('Start error:', error);
+        console.error('Start error:', error?.message || error);
     }
 });
 
@@ -1340,7 +1339,7 @@ bot.onText(/\/premium/, async (msg) => {
     try {
         await showPremiumMessage(chatId);
     } catch (error) {
-        console.error('Premium error:', error);
+        console.error('Premium error:', error?.message || error);
         bot.sendMessage(chatId, '❌ Ошибка, попробуй позже');
     }
 });
@@ -1693,7 +1692,7 @@ bot.on('callback_query', async (callbackQuery) => {
                       ] } }
                 );
             } catch (error) {
-                console.error('Ошибка создания платежа:', error);
+                console.error('Ошибка создания платежа:', error?.message || error);
                 await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Ошибка оплаты. Попробуйте позже.' });
             }
             return;
@@ -1927,7 +1926,6 @@ bot.on('callback_query', async (callbackQuery) => {
                 return;
             }
             
-            // ✅ ВАЖНО: сбрасываем ВСЕ состояния и ставим waiting_for_score
             userStates.set(userId, { action: 'waiting_for_score', matchId });
             
             await bot.editMessageText(
@@ -1947,7 +1945,6 @@ bot.on('callback_query', async (callbackQuery) => {
                 return;
             }
             
-            // ✅ Сбрасываем ВСЕ состояния
             userStates.set(userId, { action: 'editing_score', matchId });
             
             await bot.editMessageText(
@@ -2002,7 +1999,7 @@ bot.on('callback_query', async (callbackQuery) => {
         
         await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-        console.error('Callback error:', error);
+        console.error('Callback error:', error?.message || error);
         try { await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Ошибка' }); } catch (e) {}
     }
 });
@@ -2017,7 +2014,6 @@ bot.on('message', async (msg) => {
     if (!text) return;
     
     try {
-        // Личка — только приветственный экран
         if (chatId > 0) {
             if (!text.startsWith('/')) {
                 bot.sendMessage(chatId, 
@@ -2030,7 +2026,7 @@ bot.on('message', async (msg) => {
         
         const state = userStates.get(userId);
         
-        // ✅ ВВОД СЧЁТА — ПЕРВЫМ (самое важное)
+        // ✅ ВВОД СЧЁТА — ПЕРВЫМ
         if (state && (state.action === 'waiting_for_score' || state.action === 'editing_score')) {
             await handleScoreInput(chatId, userId, text);
             return;
@@ -2072,17 +2068,15 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        // ✅ FALLBACK: если написали счёт без выбора матча, но есть турнир
+        // ✅ FALLBACK: ввод счёта без выбора матча
         const scoreRegex = /^(\d+)[:\s\-](\d+)$/;
         if (scoreRegex.test(text.trim()) && currentTournament && currentTournament.active) {
             const incomplete = currentTournament.matches.filter(m => !m.completed);
             if (incomplete.length === 1) {
-                // Один незавершённый матч — применяем к нему
                 userStates.set(userId, { action: 'waiting_for_score', matchId: incomplete[0].id });
                 await handleScoreInput(chatId, userId, text);
                 return;
             } else if (incomplete.length > 1) {
-                // Несколько — спрашиваем, к какому
                 const scoreMatch = scoreRegex.exec(text.trim());
                 const score1 = parseInt(scoreMatch[1]);
                 const score2 = parseInt(scoreMatch[2]);
@@ -2288,7 +2282,7 @@ bot.on('message', async (msg) => {
                 break;
         }
     } catch (error) {
-        console.error('Message error:', error);
+        console.error('Message error:', error?.message || error);
         bot.sendMessage(chatId, '❌ Ошибка, попробуй позже');
     }
 });
@@ -2308,11 +2302,13 @@ bot.onText(/\/list_teams/, async (msg) => {
         const m = await bot.sendMessage(chatId, list, { parse_mode: 'HTML' });
         saveMessageId(chatId, m.message_id);
     } catch (error) {
-        console.error('list_teams error:', error);
+        console.error('list_teams error:', error?.message || error);
     }
 });
 
-bot.on('polling_error', (error) => { console.error('Polling error:', error); });
+bot.on('polling_error', (error) => { 
+    console.error('Polling error:', error?.message || error); 
+});
 
 // ============ ЗАПУСК ============
 
