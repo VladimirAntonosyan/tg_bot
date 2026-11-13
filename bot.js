@@ -8,7 +8,7 @@ const db = require('./db');
 const { createPayment, getPayment } = require('./payment');
 
 // ============ КОНСТАНТЫ ============
-const BOT_USERNAME = 'FcTourBot';
+const BOT_USERNAME = 'fc26avangard_bot';
 
 // ============ HEALTH CHECK + WEBHOOK ============
 const server = http.createServer(async (req, res) => {
@@ -62,11 +62,9 @@ const server = http.createServer(async (req, res) => {
                             { parse_mode: 'HTML' }
                         );
                         
-                        // Сбрасываем состояния
                         currentTournament = null;
                         tournamentMessages = [];
                         
-                        // Отправляем новое меню (обновляет reply keyboard)
                         await bot.sendMessage(chatId,
                             `💎 <b>Теперь вам доступен PRO!</b>\n\n` +
                             `Нажмите «🏆 Новый турнир» — теперь можно до 10 участников.`,
@@ -224,6 +222,130 @@ function generateParticipantId(name, existingIds = []) {
     return id;
 }
 
+// ============ ОБРАБОТКА ВВОДА СЧЁТА (вынесено отдельно) ============
+
+async function handleScoreInput(chatId, userId, text) {
+    const state = userStates.get(userId);
+    if (!state || (state.action !== 'waiting_for_score' && state.action !== 'editing_score')) return false;
+    
+    const scoreRegex = /^(\d+)[:\s\-](\d+)$/;
+    const match = scoreRegex.exec(text.trim());
+    
+    if (!match) {
+        await bot.sendMessage(chatId, 
+            '❌ Неверный формат! Введи счёт как <code>2:1</code>, <code>2 1</code> или <code>2-1</code>',
+            { parse_mode: 'HTML' }
+        );
+        return true;
+    }
+    
+    const score1 = parseInt(match[1]);
+    const score2 = parseInt(match[2]);
+    
+    if (!currentTournament) {
+        userStates.delete(userId);
+        await bot.sendMessage(chatId, '❌ Турнир не найден. Начни новый: /start');
+        return true;
+    }
+    
+    // Если matchId не указан — ищем единственный незавершённый матч
+    let matchId = state.matchId;
+    if (!matchId) {
+        const incomplete = currentTournament.matches.filter(m => !m.completed);
+        if (incomplete.length === 0) {
+            userStates.delete(userId);
+            await bot.sendMessage(chatId, '✅ Все матчи уже сыграны! Нажми "🏆 Завершить".');
+            return true;
+        }
+        if (incomplete.length > 1) {
+            // Спрашиваем, к какому матчу
+            const keyboard = {
+                reply_markup: {
+                    inline_keyboard: incomplete.map(m => [{
+                        text: `${m.player1} vs ${m.player2}`,
+                        callback_data: `record_match_${m.id}`
+                    }])
+                }
+            };
+            await bot.sendMessage(chatId, 
+                `📝 К какому матчу применить счёт <b>${score1}:${score2}</b>?`,
+                { parse_mode: 'HTML', ...keyboard }
+            );
+            return true;
+        }
+        matchId = incomplete[0].id;
+    }
+    
+    const tournamentMatch = currentTournament.matches.find(m => m.id === matchId);
+    if (!tournamentMatch) {
+        userStates.delete(userId);
+        await bot.sendMessage(chatId, '❌ Матч не найден. Попробуй снова: "✏️ Записать результат"');
+        return true;
+    }
+    
+    if (tournamentMatch.completed) {
+        userStates.delete(userId);
+        await bot.sendMessage(chatId, '⚠️ Этот матч уже завершён. Выбери другой.');
+        return true;
+    }
+    
+    // Ничья — спрашиваем пенальти
+    if (score1 === score2) {
+        userStates.set(userId, { 
+            action: 'waiting_for_penalty', 
+            matchId: matchId, 
+            score1: score1, 
+            score2: score2,
+            isEditing: state.action === 'editing_score'
+        });
+        
+        const keyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: tournamentMatch.player1, callback_data: `penalty_${tournamentMatch.player1}` }],
+                    [{ text: tournamentMatch.player2, callback_data: `penalty_${tournamentMatch.player2}` }]
+                ]
+            }
+        };
+        
+        const pMsg = await bot.sendMessage(chatId, 
+            `⚽️ Ничья ${score1}:${score2}!\n\nКто победил по пенальти?`, 
+            keyboard
+        );
+        saveMessageId(chatId, pMsg.message_id);
+        return true;
+    }
+    
+    // Победа в основное время
+    tournamentMatch.score1 = score1;
+    tournamentMatch.score2 = score2;
+    tournamentMatch.penalties = null;
+    tournamentMatch.completed = true;
+    
+    await db.recordMatch(chatId, tournamentMatch, currentTournament.participants, currentTournament.type);
+    
+    const resMsg = await bot.sendMessage(chatId, 
+        `✅ Результат записан!\n\n${tournamentMatch.player1} <b>${score1}:${score2}</b> ${tournamentMatch.player2}`,
+        { parse_mode: 'HTML' }
+    );
+    saveMessageId(chatId, resMsg.message_id);
+    
+    const stats = calculateStats(currentTournament.participants, currentTournament.matches);
+    const sMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
+    const lMsg = await bot.sendMessage(chatId, getLiveStatus(currentTournament.matches), { parse_mode: 'HTML' });
+    saveMessageId(chatId, sMsg.message_id);
+    saveMessageId(chatId, lMsg.message_id);
+    
+    userStates.delete(userId);
+    
+    if (currentTournament.matches.every(m => m.completed)) {
+        const cMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "🏆 Завершить".');
+        saveMessageId(chatId, cMsg.message_id);
+    }
+    
+    return true;
+}
+
 // ============ ПРИВЕТСТВЕННЫЙ ЭКРАН В ЛИЧКЕ ============
 
 async function sendWelcomeScreen(chatId, user) {
@@ -277,7 +399,7 @@ async function sendWelcomeScreen(chatId, user) {
     });
 }
 
-// ============ ОНБОРДИНГ (с кнопкой «Добавить участника») ============
+// ============ ОНБОРДИНГ ============
 
 async function startOnboarding(chatId, userId) {
     const isAdminUser = await isAdmin(chatId, userId);
@@ -316,7 +438,7 @@ async function askOnboardingCount(chatId, userId) {
     await bot.sendMessage(chatId,
         `🎯 <b>Настройка турнира</b>\n\n` +
         `Сколько человек будет играть? (2-${maxCount})\n\n` +
-        `<i>${isPro ? 'PRO-версия: до 10 участников' : `Бесплатная версия: до ${maxCount} участников`}</i>`,
+        `<i>${isPro ? '💎 PRO' : '🆓 Бесплатно'} · до ${maxCount} участников</i>`,
         {
             parse_mode: 'HTML',
             reply_markup: { inline_keyboard: rows }
@@ -427,70 +549,6 @@ async function finishOnboarding(chatId, userId) {
     });
 }
 
-// Старый онбординг (для совместимости)
-async function handleOnboardingInput(chatId, userId, text) {
-    const state = userStates.get(userId);
-    if (!state || state.action !== 'onboarding') return false;
-    
-    const parts = text.trim().split(/\s+/);
-    const name = parts[0];
-    const username = parts[1] ? parts[1].replace('@', '') : null;
-    
-    if (!name || name.length > 30) {
-        await bot.sendMessage(chatId, '❌ Имя должно быть от 1 до 30 символов. Попробуй снова:');
-        return true;
-    }
-    
-    const existingIds = state.participants.map(p => p.id);
-    const participantId = generateParticipantId(name, existingIds);
-    
-    state.participants.push({ id: participantId, name, username });
-    state.current++;
-    
-    if (state.current > state.count) {
-        for (const p of state.participants) {
-            await db.addParticipant(chatId, p.id, p.name, p.username);
-        }
-        
-        await db.setClubs(chatId, DEFAULT_CLUBS);
-        await db.setNationalTeams(chatId, DEFAULT_NATIONAL_TEAMS);
-        
-        try {
-            await db.setSubscription(chatId, 'free');
-        } catch (e) {}
-        
-        userStates.delete(userId);
-        
-        let list = '✅ <b>Настройка завершена!</b>\n\n<b>Участники:</b>\n';
-        state.participants.forEach((p, i) => {
-            list += `${i + 1}. ${p.name}${p.username ? ` (@${p.username})` : ''}\n`;
-        });
-        
-        const limits = await getLimits(chatId);
-        list += `\n📋 Загружено <b>${DEFAULT_CLUBS.length}</b> клубов и <b>${DEFAULT_NATIONAL_TEAMS.length}</b> сборных.\n\n`;
-        list += `💎 Ваш тариф: <b>${limits.maxTournaments === Infinity ? 'PRO' : 'FREE'}</b>\n`;
-        list += `• Максимум участников: ${limits.maxParticipants}\n`;
-        list += `• Максимум турниров: ${limits.maxTournaments === Infinity ? '∞' : limits.maxTournaments}\n\n`;
-        list += `Начинайте! Нажмите "🏆 Новый турнир"`;
-        
-        const isAdminUser = await isAdmin(chatId, userId);
-        await bot.sendMessage(chatId, list, {
-            parse_mode: 'HTML',
-            ...getMainKeyboard(isAdminUser, false)
-        });
-        
-        return true;
-    }
-    
-    await bot.sendMessage(chatId,
-        `👤 <b>Участник ${state.current} из ${state.count}</b>\n\n` +
-        `Введи имя (можно с @username):`,
-        { parse_mode: 'HTML' }
-    );
-    
-    return true;
-}
-
 // ============ ГЕНЕРАЦИЯ РАСПИСАНИЯ ============
 
 function generateSchedule(participants) {
@@ -512,7 +570,7 @@ function generateSchedule(participants) {
     return matches;
 }
 
-// ============ СТАТИСТИКА ТУРНИРА ============
+// ============ СТАТИСТИКА ============
 
 function calculateStats(participants, matches) {
     const stats = {};
@@ -554,8 +612,6 @@ function calculateStats(participants, matches) {
     
     return Object.values(stats);
 }
-
-// ============ ГЛОБАЛЬНАЯ СТАТИСТИКА ============
 
 async function calculateGlobalStats(chatId) {
     const records = await db.getAllMatches(chatId);
@@ -627,12 +683,9 @@ async function calculateGlobalStats(chatId) {
     return Object.values(playerStats);
 }
 
-// ============ АЧИВКИ ============
-
 async function calculateAchievements(chatId, playerName) {
     const records = await db.getAllMatches(chatId);
     const achievements = [];
-    
     const sortedMatches = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
     
     let matchesPlayed = 0;
@@ -647,16 +700,11 @@ async function calculateAchievements(chatId, playerName) {
         if (!isPlayer1 && !isPlayer2) return;
         
         matchesPlayed++;
-        
         let isWin = false;
         
         if (m.penalties) {
-            if (m.penalties === playerName) {
-                isWin = true;
-                penaltyWins++;
-            } else {
-                penaltyLosses++;
-            }
+            if (m.penalties === playerName) { isWin = true; penaltyWins++; }
+            else penaltyLosses++;
         } else if (isPlayer1) {
             if (m.score1 > m.score2) isWin = true;
         } else if (isPlayer2) {
@@ -682,12 +730,9 @@ async function formatPlayerProfile(chatId, playerName) {
     const allStats = await calculateGlobalStats(chatId);
     const playerStats = allStats.find(s => s.name === playerName);
     
-    if (!playerStats) {
-        return `👤 <b>${playerName}</b>\n\n❌ Игрок не найден!`;
-    }
+    if (!playerStats) return `👤 <b>${playerName}</b>\n\n❌ Игрок не найден!`;
     
     const achievementsData = await calculateAchievements(chatId, playerName);
-    
     const sorted = [...allStats].sort((a, b) => {
         if (a.points !== b.points) return b.points - a.points;
         if (a.wins !== b.wins) return b.wins - a.wins;
@@ -752,8 +797,6 @@ function createProfileSelectionKeyboard(participants) {
     inlineKeyboard.push([{ text: '❌ Отмена', callback_data: 'profile_cancel' }]);
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
-
-// ============ СТАТИСТИКА КОМАНД ============
 
 async function getTeamStats(chatId) {
     const records = await db.getAllMatches(chatId);
@@ -843,8 +886,6 @@ async function formatTeamStats(chatId) {
     return message;
 }
 
-// ============ ЛИЧНЫЕ ВСТРЕЧИ ============
-
 async function getHeadToHeadStats(chatId, player1Name, player2Name) {
     const records = await db.getAllMatches(chatId);
     const matches = records.filter(r => 
@@ -861,11 +902,8 @@ async function getHeadToHeadStats(chatId, player1Name, player2Name) {
     
     matches.forEach(m => {
         let scoreForP1, scoreForP2;
-        if (m.player1 === player1Name) {
-            scoreForP1 = m.score1; scoreForP2 = m.score2;
-        } else {
-            scoreForP1 = m.score2; scoreForP2 = m.score1;
-        }
+        if (m.player1 === player1Name) { scoreForP1 = m.score1; scoreForP2 = m.score2; }
+        else { scoreForP1 = m.score2; scoreForP2 = m.score1; }
         p1Goals += scoreForP1; p2Goals += scoreForP2;
         
         if (m.penalties) {
@@ -891,9 +929,7 @@ async function getHeadToHeadStats(chatId, player1Name, player2Name) {
 }
 
 function formatHeadToHead(player1Name, player2Name, stats) {
-    if (!stats) {
-        return `⚔️ <b>${player1Name} vs ${player2Name}</b>\n\n❌ Эти игроки еще не встречались!`;
-    }
+    if (!stats) return `⚔️ <b>${player1Name} vs ${player2Name}</b>\n\n❌ Эти игроки еще не встречались!`;
     
     const totalGoals = stats.p1Goals + stats.p2Goals;
     
@@ -935,8 +971,6 @@ function formatHeadToHead(player1Name, player2Name, stats) {
     
     return message;
 }
-
-// ============ ТАБЛИЦЫ ============
 
 function getStandingsTable(stats) {
     const sorted = [...stats].sort((a, b) => {
@@ -994,8 +1028,6 @@ function getLiveStatus(matches) {
     return status;
 }
 
-// ============ КЛАВИАТУРЫ ============
-
 function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     if (isTournamentActive) {
         const keyboard = [
@@ -1021,7 +1053,6 @@ function getMainKeyboard(isAdminUser = false, isTournamentActive = false) {
     return { reply_markup: { keyboard, resize_keyboard: true, persistent: true } };
 }
 
-// Клавиатура редактирования списка команд (4 действия + назад)
 function getEditTeamsKeyboard() {
     return {
         inline_keyboard: [
@@ -1033,9 +1064,7 @@ function getEditTeamsKeyboard() {
                 { text: '➕ Добавить сборную', callback_data: 'edit_teams_add_national' },
                 { text: '❌ Удалить сборную', callback_data: 'edit_teams_remove_national' }
             ],
-            [
-                { text: '◀️ Назад в меню', callback_data: 'edit_teams_back' }
-            ]
+            [{ text: '◀️ Назад в меню', callback_data: 'edit_teams_back' }]
         ]
     };
 }
@@ -1104,8 +1133,6 @@ function createH2HSecondPlayerKeyboard(participants, firstPlayerName) {
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
-// ============ PREMIUM UI ============
-
 async function showPremiumMessage(chatId, messageId = null) {
     const sub = await db.getSubscription(chatId);
     const limits = await getLimits(chatId);
@@ -1124,9 +1151,7 @@ async function showPremiumMessage(chatId, messageId = null) {
             `• Максимум участников: ${limits.maxParticipants}\n\n` +
             `Спасибо за поддержку! 🙏`;
         keyboard = {
-            inline_keyboard: [
-                [{ text: '📊 Общий рейтинг', callback_data: 'premium_show_rating' }]
-            ]
+            inline_keyboard: [[{ text: '📊 Общий рейтинг', callback_data: 'premium_show_rating' }]]
         };
     } else {
         const remaining = Math.max(0, limits.maxTournaments - tourCount);
@@ -1157,8 +1182,6 @@ async function showPremiumMessage(chatId, messageId = null) {
     }
 }
 
-// ============ ПРОВЕРКА ОПЛАТЫ ============
-
 async function checkPendingPayments(chatId) {
     const payments = await db.getPendingPaymentsByChat(chatId);
     
@@ -1187,10 +1210,7 @@ async function checkPendingPayments(chatId) {
                 
                 await bot.sendMessage(chatId,
                     `💎 <b>Теперь вам доступен PRO!</b>`,
-                    {
-                        parse_mode: 'HTML',
-                        ...getMainKeyboard(false, false)
-                    }
+                    { parse_mode: 'HTML', ...getMainKeyboard(false, false) }
                 );
                 
                 return true;
@@ -1334,7 +1354,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const messageId = callbackQuery.message.message_id;
     
     try {
-        // ============ ПРИВЕТСТВЕННЫЕ КНОПКИ ============
+        // Приветственные кнопки
         if (data === 'welcome_premium') {
             await bot.editMessageText(
                 `💎 <b>PRO-версия</b>\n\n` +
@@ -1396,21 +1416,16 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         
-        // ============ РЕДАКТИРОВАНИЕ СПИСКА КОМАНД (4 в 1) ============
+        // Редактирование команд
         if (data === 'edit_teams') {
             const isAdminUser = await isAdmin(chatId, userId);
             if (!isAdminUser) {
                 await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
                 return;
             }
-            
             await bot.sendMessage(chatId,
-                `✏️ <b>Редактирование списка команд</b>\n\n` +
-                `Выберите действие:`,
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: getEditTeamsKeyboard()
-                }
+                `✏️ <b>Редактирование списка команд</b>\n\nВыберите действие:`,
+                { parse_mode: 'HTML', reply_markup: getEditTeamsKeyboard() }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1418,22 +1433,13 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data === 'edit_teams_add_club') {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             userStates.set(userId, { action: 'waiting_for_club_name' });
             await bot.editMessageText(
-                `✏️ <b>Добавление клуба</b>\n\n` +
-                `Введи название клуба в чат.\n\n` +
-                `Пример: <code>Спартак Москва</code>`,
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                    }
-                }
+                `✏️ <b>Добавление клуба</b>\n\nВведи название клуба в чат.\n\nПример: <code>Спартак Москва</code>`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                  reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1441,22 +1447,13 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data === 'edit_teams_add_national') {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             userStates.set(userId, { action: 'waiting_for_national_name' });
             await bot.editMessageText(
-                `✏️ <b>Добавление сборной</b>\n\n` +
-                `Введи название сборной в чат.\n\n` +
-                `Пример: <code>Кабо-Верде</code>`,
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                    }
-                }
+                `✏️ <b>Добавление сборной</b>\n\nВведи название сборной в чат.\n\nПример: <code>Кабо-Верде</code>`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                  reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1464,39 +1461,25 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data === 'edit_teams_remove_club') {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             const clubList = await db.getClubs(chatId);
             if (clubList.length === 0) {
-                await bot.editMessageText(
-                    `📋 Список клубов пуст. Нечего удалять.`,
-                    {
-                        chat_id: chatId, message_id: messageId,
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
+                await bot.editMessageText(`📋 Список клубов пуст. Нечего удалять.`,
+                    { chat_id: chatId, message_id: messageId,
+                      reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
                 );
                 await bot.answerCallbackQuery(callbackQuery.id);
                 return;
             }
             
             userStates.set(userId, { action: 'waiting_for_club_remove', list: clubList });
-            
-            // Формируем кнопки по 1 в ряд (клубы могут быть длинными)
             const clubBtns = clubList.map(t => [{ text: t, callback_data: `edit_teams_remove_club_${clubList.indexOf(t)}` }]);
             clubBtns.push([{ text: '◀️ Назад', callback_data: 'edit_teams' }]);
             
             await bot.editMessageText(
-                `❌ <b>Удаление клуба</b>\n\n` +
-                `Выбери клуб для удаления:`,
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    reply_markup: { inline_keyboard: clubBtns }
-                }
+                `❌ <b>Удаление клуба</b>\n\nВыбери клуб для удаления:`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', reply_markup: { inline_keyboard: clubBtns } }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1504,10 +1487,7 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data.startsWith('edit_teams_remove_club_')) {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             const index = parseInt(data.replace('edit_teams_remove_club_', ''));
             const state = userStates.get(userId);
@@ -1518,68 +1498,38 @@ bot.on('callback_query', async (callbackQuery) => {
             
             const clubName = state.list[index];
             const success = await db.removeClub(chatId, clubName);
-            
             userStates.delete(userId);
             
-            if (success) {
-                await bot.editMessageText(
-                    `✅ Клуб "${clubName}" удалён!`,
-                    {
-                        chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
-                );
-            } else {
-                await bot.editMessageText(
-                    `❌ Клуб "${clubName}" не найден!`,
-                    {
-                        chat_id: chatId, message_id: messageId,
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
-                );
-            }
+            await bot.editMessageText(
+                success ? `✅ Клуб "${clubName}" удалён!` : `❌ Клуб "${clubName}" не найден!`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                  reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
+            );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
         
         if (data === 'edit_teams_remove_national') {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             const natList = await db.getNationalTeams(chatId);
             if (natList.length === 0) {
-                await bot.editMessageText(
-                    `📋 Список сборных пуст. Нечего удалять.`,
-                    {
-                        chat_id: chatId, message_id: messageId,
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
+                await bot.editMessageText(`📋 Список сборных пуст. Нечего удалять.`,
+                    { chat_id: chatId, message_id: messageId,
+                      reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
                 );
                 await bot.answerCallbackQuery(callbackQuery.id);
                 return;
             }
             
             userStates.set(userId, { action: 'waiting_for_national_remove', list: natList });
-            
             const natBtns = natList.map(t => [{ text: t, callback_data: `edit_teams_remove_national_${natList.indexOf(t)}` }]);
             natBtns.push([{ text: '◀️ Назад', callback_data: 'edit_teams' }]);
             
             await bot.editMessageText(
-                `❌ <b>Удаление сборной</b>\n\n` +
-                `Выбери сборную для удаления:`,
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    reply_markup: { inline_keyboard: natBtns }
-                }
+                `❌ <b>Удаление сборной</b>\n\nВыбери сборную для удаления:`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', reply_markup: { inline_keyboard: natBtns } }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1587,10 +1537,7 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data.startsWith('edit_teams_remove_national_')) {
             const isAdminUser = await isAdmin(chatId, userId);
-            if (!isAdminUser) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' });
-                return;
-            }
+            if (!isAdminUser) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⛔️ Только админ!' }); return; }
             
             const index = parseInt(data.replace('edit_teams_remove_national_', ''));
             const state = userStates.get(userId);
@@ -1601,30 +1548,13 @@ bot.on('callback_query', async (callbackQuery) => {
             
             const natName = state.list[index];
             const success = await db.removeNationalTeam(chatId, natName);
-            
             userStates.delete(userId);
             
-            if (success) {
-                await bot.editMessageText(
-                    `✅ Сборная "${natName}" удалена!`,
-                    {
-                        chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
-                );
-            } else {
-                await bot.editMessageText(
-                    `❌ Сборная "${natName}" не найдена!`,
-                    {
-                        chat_id: chatId, message_id: messageId,
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]]
-                        }
-                    }
-                );
-            }
+            await bot.editMessageText(
+                success ? `✅ Сборная "${natName}" удалена!` : `❌ Сборная "${natName}" не найдена!`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                  reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'edit_teams' }]] } }
+            );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
@@ -1632,33 +1562,24 @@ bot.on('callback_query', async (callbackQuery) => {
         if (data === 'edit_teams_back') {
             userStates.delete(userId);
             await bot.deleteMessage(chatId, messageId).catch(() => {});
-            
             const isAdminUser = await isAdmin(chatId, userId);
-            await bot.sendMessage(chatId,
-                '⬅️ Главное меню',
-                getMainKeyboard(isAdminUser, !!currentTournament)
-            );
+            await bot.sendMessage(chatId, '⬅️ Главное меню', getMainKeyboard(isAdminUser, !!currentTournament));
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
         
-        // ============ ОНБОРДИНГ (новый) ============
+        // Онбординг
         if (data.startsWith('onb2_count_')) {
             const count = parseInt(data.replace('onb2_count_', ''));
             const limits = await getLimits(chatId);
             
             if (count > limits.maxParticipants) {
-                await bot.answerCallbackQuery(callbackQuery.id, {
-                    text: `⚠️ В бесплатной версии максимум ${limits.maxParticipants} участника. Купи PRO: /premium`
-                });
+                await bot.answerCallbackQuery(callbackQuery.id, { text: `⚠️ В бесплатной версии максимум ${limits.maxParticipants} участника. Купи PRO: /premium` });
                 return;
             }
             
             const state = userStates.get(userId);
-            if (!state) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Сессия истекла, напиши /start' });
-                return;
-            }
+            if (!state) { await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Сессия истекла, напиши /start' }); return; }
             
             state.expectedCount = count;
             state.participants = [];
@@ -1666,7 +1587,6 @@ bot.on('callback_query', async (callbackQuery) => {
             userStates.set(userId, state);
             
             await bot.deleteMessage(chatId, messageId).catch(() => {});
-            
             await showOnboardingScreen(chatId, userId);
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1682,15 +1602,8 @@ bot.on('callback_query', async (callbackQuery) => {
             state.waitingForName = true;
             userStates.set(userId, state);
             
-            await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: chatId,
-                message_id: messageId
-            }).catch(() => {});
-            
-            await bot.sendMessage(chatId,
-                `👤 <b>Введи имя участника</b>`,
-                { parse_mode: 'HTML' }
-            );
+            await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(() => {});
+            await bot.sendMessage(chatId, `👤 <b>Введи имя участника в чат</b>`, { parse_mode: 'HTML' });
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
@@ -1705,54 +1618,18 @@ bot.on('callback_query', async (callbackQuery) => {
         if (data === 'onb2_cancel') {
             userStates.delete(userId);
             await bot.answerCallbackQuery(callbackQuery.id);
-            await bot.editMessageText('❌ Настройка отменена. Напиши /start чтобы начать заново.', {
-                chat_id: chatId,
-                message_id: messageId
-            });
+            await bot.editMessageText('❌ Настройка отменена. Напиши /start чтобы начать заново.', { chat_id: chatId, message_id: messageId });
             return;
         }
         
-        // ============ ОНБОРДИНГ (старый, для совместимости) ============
-        if (data.startsWith('onb_count_')) {
-            const count = parseInt(data.replace('onb_count_', ''));
-            await bot.deleteMessage(chatId, messageId).catch(() => {});
-            
-            const limits = await getLimits(chatId);
-            if (count > limits.maxParticipants) {
-                await bot.sendMessage(chatId, `⚠️ В бесплатной версии максимум ${limits.maxParticipants} участника. Купи PRO: /premium`);
-                return;
-            }
-            
-            userStates.set(userId, {
-                action: 'onboarding',
-                step: 'enter_names',
-                count: count,
-                current: 1,
-                participants: []
-            });
-            
-            await bot.sendMessage(chatId,
-                `👤 <b>Участник 1 из ${count}</b>\n\n` +
-                `Введи имя (можно с @username для тегов):\n\n` +
-                `Пример: <code>Владимир @antsn21</code>\n` +
-                `Или просто: <code>Владимир</code>`,
-                { parse_mode: 'HTML' }
-            );
-            await bot.answerCallbackQuery(callbackQuery.id);
-            return;
-        }
-        
-        // ============ RESET ============
+        // Reset
         if (data === 'reset_confirm') {
             await db.clearParticipants(chatId);
             await db.setClubs(chatId, []);
             await db.setNationalTeams(chatId, []);
             currentTournament = null;
             tournamentMessages = [];
-            
-            await bot.editMessageText('✅ Все данные удалены. Напиши /start для новой настройки.', {
-                chat_id: chatId, message_id: messageId
-            });
+            await bot.editMessageText('✅ Все данные удалены. Напиши /start для новой настройки.', { chat_id: chatId, message_id: messageId });
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
         }
@@ -1763,15 +1640,13 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         
-        // ============ ПРОФИЛЬ ============
+        // Профиль
         if (data.startsWith('profile_') && data !== 'profile_cancel' && data !== 'profile_back') {
             const playerName = data.replace('profile_', '');
             const profileText = await formatPlayerProfile(chatId, playerName);
             await bot.editMessageText(profileText, {
                 chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [[{ text: '◀️ К выбору игрока', callback_data: 'profile_back' }]]
-                }
+                reply_markup: { inline_keyboard: [[{ text: '◀️ К выбору игрока', callback_data: 'profile_back' }]] }
             });
             saveMessageId(chatId, messageId);
             await bot.answerCallbackQuery(callbackQuery.id);
@@ -1780,12 +1655,8 @@ bot.on('callback_query', async (callbackQuery) => {
         
         if (data === 'profile_back') {
             const participants = await db.getParticipants(chatId);
-            await bot.editMessageText(
-                '👤 <b>ПРОФИЛЬ ИГРОКА</b>\n\nВыбери игрока:',
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    ...createProfileSelectionKeyboard(participants)
-                }
+            await bot.editMessageText('👤 <b>ПРОФИЛЬ ИГРОКА</b>\n\nВыбери игрока:',
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', ...createProfileSelectionKeyboard(participants) }
             );
             saveMessageId(chatId, messageId);
             await bot.answerCallbackQuery(callbackQuery.id);
@@ -1798,23 +1669,15 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         
-        // ============ PREMIUM ============
+        // Premium
         if (data === 'premium_buy') {
             try {
                 const sub = await db.getSubscription(chatId);
-                if (sub.tier === 'pro') {
-                    await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ PRO уже активен!' });
-                    return;
-                }
+                if (sub.tier === 'pro') { await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ PRO уже активен!' }); return; }
                 
                 await bot.answerCallbackQuery(callbackQuery.id, { text: '⏳ Создаём платёж...' });
                 
-                const payment = await createPayment(
-                    chatId,
-                    200,
-                    `PRO-версия для чата ${chatId}`
-                );
-                
+                const payment = await createPayment(chatId, 200, `PRO-версия для чата ${chatId}`);
                 await db.savePendingPayment(payment.id, chatId, 200);
                 
                 await bot.editMessageText(
@@ -1823,37 +1686,27 @@ bot.on('callback_query', async (callbackQuery) => {
                     `Способ оплаты: <b>СБП / Карта</b>\n\n` +
                     `Нажмите кнопку ниже — откроется страница оплаты ЮKassa.\n\n` +
                     `<i>После оплаты вернитесь в чат — PRO активируется автоматически.</i>`,
-                    {
-                        chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '💳 Оплатить 200 ₽', url: payment.confirmationUrl }],
-                                [{ text: '❌ Отмена', callback_data: 'premium_cancel' }]
-                            ]
-                        }
-                    }
+                    { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                      reply_markup: { inline_keyboard: [
+                          [{ text: '💳 Оплатить 200 ₽', url: payment.confirmationUrl }],
+                          [{ text: '❌ Отмена', callback_data: 'premium_cancel' }]
+                      ] } }
                 );
             } catch (error) {
                 console.error('Ошибка создания платежа:', error);
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: '❌ Ошибка оплаты. Попробуйте позже.' 
-                });
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Ошибка оплаты. Попробуйте позже.' });
             }
             return;
         }
         
         if (data === 'premium_check') {
             await bot.answerCallbackQuery(callbackQuery.id, { text: '🔄 Проверяем...' });
-            
             const activated = await checkPendingPayments(chatId);
-            
             if (activated) {
                 await bot.deleteMessage(chatId, messageId).catch(() => {});
                 await showPremiumMessage(chatId);
             } else {
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: '❌ Оплата не найдена. Если вы уже оплатили — подождите минуту и попробуйте снова.' 
-                });
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Оплата не найдена. Если вы уже оплатили — подождите минуту и попробуйте снова.' });
             }
             return;
         }
@@ -1882,15 +1735,11 @@ bot.on('callback_query', async (callbackQuery) => {
                 `Для одного чата. В других чатах — бесплатная версия.\n\n` +
                 `<b>Как оплатить?</b>\n` +
                 `Нажмите «Купить PRO» — откроется страница ЮKassa.`,
-                {
-                    chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '💳 Купить PRO', callback_data: 'premium_buy' }],
-                            [{ text: '◀️ Назад', callback_data: 'premium_back' }]
-                        ]
-                    }
-                }
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML',
+                  reply_markup: { inline_keyboard: [
+                      [{ text: '💳 Купить PRO', callback_data: 'premium_buy' }],
+                      [{ text: '◀️ Назад', callback_data: 'premium_back' }]
+                  ] } }
             );
             await bot.answerCallbackQuery(callbackQuery.id);
             return;
@@ -1909,7 +1758,7 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         
-        // ============ H2H ============
+        // H2H
         if (data.startsWith('h2h_first_')) {
             const firstPlayer = data.replace('h2h_first_', '');
             const participants = await db.getParticipants(chatId);
@@ -1939,7 +1788,7 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         
-        // ============ ТУРНИР ============
+        // Турнир
         if (data.startsWith('tournament_toggle_')) {
             const participantId = data.replace('tournament_toggle_', '');
             const participants = await db.getParticipants(chatId);
@@ -1947,10 +1796,7 @@ bot.on('callback_query', async (callbackQuery) => {
             let selected = selectedParticipants.get(selectionKey) || [];
             const participant = participants.find(p => p.id === participantId);
             
-            if (!participant) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Участник не найден' });
-                return;
-            }
+            if (!participant) { await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Участник не найден' }); return; }
             
             if (selected.includes(participantId)) {
                 selected = selected.filter(id => id !== participantId);
@@ -1958,9 +1804,7 @@ bot.on('callback_query', async (callbackQuery) => {
             } else {
                 const limits = await getLimits(chatId);
                 if (selected.length >= limits.maxParticipants) {
-                    await bot.answerCallbackQuery(callbackQuery.id, { 
-                        text: `⚠️ Максимум ${limits.maxParticipants} участников (${limits.maxTournaments === Infinity ? 'PRO' : 'FREE'}).\nКупи PRO: /premium` 
-                    });
+                    await bot.answerCallbackQuery(callbackQuery.id, { text: `⚠️ Максимум ${limits.maxParticipants} участников. Купи PRO: /premium` });
                     return;
                 }
                 selected.push(participantId);
@@ -1987,9 +1831,7 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data === 'toggle_world_cup') {
             const currentMode = tournamentMode.get(chatId) || false;
             tournamentMode.set(chatId, !currentMode);
-            await bot.answerCallbackQuery(callbackQuery.id, { 
-                text: !currentMode ? '🌍 Режим ЧМ' : '⚽ Клубы' 
-            });
+            await bot.answerCallbackQuery(callbackQuery.id, { text: !currentMode ? '🌍 Режим ЧМ' : '⚽ Клубы' });
             
             const participants = await db.getParticipants(chatId);
             const selectionKey = `tournament_${chatId}`;
@@ -2015,10 +1857,7 @@ bot.on('callback_query', async (callbackQuery) => {
             const worldCup = tournamentMode.get(chatId) || false;
             const participants = await db.getParticipants(chatId);
             
-            if (selected.length < 2) {
-                await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Минимум 2 участника!' });
-                return;
-            }
+            if (selected.length < 2) { await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Минимум 2 участника!' }); return; }
             
             const limits = await getLimits(chatId);
             const tourCount = await db.getTournamentCount(chatId);
@@ -2032,9 +1871,7 @@ bot.on('callback_query', async (callbackQuery) => {
             
             const teams = worldCup ? await db.getNationalTeams(chatId) : await db.getClubs(chatId);
             if (teams.length < selected.length) {
-                await bot.editMessageText(`❌ Недостаточно команд!`, {
-                    chat_id: chatId, message_id: messageId
-                });
+                await bot.editMessageText(`❌ Недостаточно команд!`, { chat_id: chatId, message_id: messageId });
                 selectedParticipants.delete(selectionKey);
                 tournamentMode.delete(chatId);
                 return;
@@ -2063,9 +1900,7 @@ bot.on('callback_query', async (callbackQuery) => {
             matches.forEach(m => { drawMessage += `${m.player1} vs ${m.player2}\n`; });
             drawMessage += `\n<b>🏟 Статус:</b> 0 из ${matches.length} матчей`;
             
-            await bot.editMessageText(drawMessage, {
-                chat_id: chatId, message_id: messageId, parse_mode: 'HTML'
-            });
+            await bot.editMessageText(drawMessage, { chat_id: chatId, message_id: messageId, parse_mode: 'HTML' });
             saveMessageId(chatId, messageId);
             
             selectedParticipants.delete(selectionKey);
@@ -2091,10 +1926,17 @@ bot.on('callback_query', async (callbackQuery) => {
                 await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч завершен!' });
                 return;
             }
+            
+            // ✅ ВАЖНО: сбрасываем ВСЕ состояния и ставим waiting_for_score
             userStates.set(userId, { action: 'waiting_for_score', matchId });
-            await bot.editMessageText(`📝 Введи счет:\n${match.player1} vs ${match.player2}`, {
-                chat_id: chatId, message_id: messageId
-            });
+            
+            await bot.editMessageText(
+                `📝 <b>Введи счёт матча:</b>\n\n` +
+                `${match.player1} vs ${match.player2}\n\n` +
+                `Просто отправь сообщение с результатом:\n` +
+                `<code>3:1</code> или <code>2 0</code> или <code>1-1</code>`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML' }
+            );
             saveMessageId(chatId, messageId);
         } else if (data.startsWith('edit_match_')) {
             const matchId = parseInt(data.replace('edit_match_', ''));
@@ -2104,10 +1946,17 @@ bot.on('callback_query', async (callbackQuery) => {
                 await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Матч не завершен!' });
                 return;
             }
+            
+            // ✅ Сбрасываем ВСЕ состояния
             userStates.set(userId, { action: 'editing_score', matchId });
-            await bot.editMessageText(`✏️ Новый счет:\n${match.player1} vs ${match.player2}\nТекущий: ${match.score1}:${match.score2}`, {
-                chat_id: chatId, message_id: messageId
-            });
+            
+            await bot.editMessageText(
+                `✏️ <b>Введи новый счёт:</b>\n\n` +
+                `${match.player1} vs ${match.player2}\n\n` +
+                `Текущий: ${match.score1}:${match.score2}\n\n` +
+                `Отправь сообщение с новым счётом:`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'HTML' }
+            );
             saveMessageId(chatId, messageId);
         } else if (data === 'cancel_record' || data === 'cancel_edit') {
             userStates.delete(userId);
@@ -2132,9 +1981,10 @@ bot.on('callback_query', async (callbackQuery) => {
             
             await db.recordMatch(chatId, match, currentTournament.participants, currentTournament.type);
             
-            await bot.editMessageText(`✅ ${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n🏆 Пенальти: ${winner}`, {
-                chat_id: chatId, message_id: callbackQuery.message.message_id
-            });
+            await bot.editMessageText(
+                `✅ ${match.player1} ${userState.score1}:${userState.score2} ${match.player2}\n🏆 Пенальти: ${winner}`,
+                { chat_id: chatId, message_id: callbackQuery.message.message_id }
+            );
             
             const stats = calculateStats(currentTournament.participants, currentTournament.matches);
             const sMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
@@ -2153,9 +2003,7 @@ bot.on('callback_query', async (callbackQuery) => {
         await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
         console.error('Callback error:', error);
-        try {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Ошибка' });
-        } catch (e) {}
+        try { await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Ошибка' }); } catch (e) {}
     }
 });
 
@@ -2169,18 +2017,12 @@ bot.on('message', async (msg) => {
     if (!text) return;
     
     try {
+        // Личка — только приветственный экран
         if (chatId > 0) {
             if (!text.startsWith('/')) {
                 bot.sendMessage(chatId, 
-                    `💡 Я работаю только в групповых чатах.\n\n` +
-                    `Добавьте меня в чат с друзьями, чтобы начать турнир.`,
-                    {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ Добавить в чат', url: `https://t.me/${BOT_USERNAME}?startgroup=true` }]
-                            ]
-                        }
-                    }
+                    `💡 Я работаю только в групповых чатах.\n\nДобавьте меня в чат с друзьями, чтобы начать турнир.`,
+                    { reply_markup: { inline_keyboard: [[{ text: '➕ Добавить в чат', url: `https://t.me/${BOT_USERNAME}?startgroup=true` }]] } }
                 );
             }
             return;
@@ -2188,19 +2030,19 @@ bot.on('message', async (msg) => {
         
         const state = userStates.get(userId);
         
+        // ✅ ВВОД СЧЁТА — ПЕРВЫМ (самое важное)
+        if (state && (state.action === 'waiting_for_score' || state.action === 'editing_score')) {
+            await handleScoreInput(chatId, userId, text);
+            return;
+        }
+        
         // Новый онбординг
         if (state && state.action === 'onboarding_new') {
             await handleOnboardingNewInput(chatId, userId, text);
             return;
         }
         
-        // Старый онбординг (для совместимости)
-        if (state && state.action === 'onboarding') {
-            await handleOnboardingInput(chatId, userId, text);
-            return;
-        }
-        
-        // Ввод названия клуба (через inline-меню)
+        // Ввод названия клуба
         if (state && state.action === 'waiting_for_club_name') {
             if (text === '🔙 Отмена') {
                 userStates.delete(userId);
@@ -2211,14 +2053,11 @@ bot.on('message', async (msg) => {
             const success = await db.addClub(chatId, text);
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            bot.sendMessage(chatId, 
-                success ? `✅ Клуб "${text}" добавлен!` : `⚠️ Клуб "${text}" уже есть!`, 
-                getMainKeyboard(isAdminUser, !!currentTournament)
-            );
+            bot.sendMessage(chatId, success ? `✅ Клуб "${text}" добавлен!` : `⚠️ Клуб "${text}" уже есть!`, getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
         
-        // Ввод названия сборной (через inline-меню)
+        // Ввод названия сборной
         if (state && state.action === 'waiting_for_national_name') {
             if (text === '🔙 Отмена') {
                 userStates.delete(userId);
@@ -2229,62 +2068,39 @@ bot.on('message', async (msg) => {
             const success = await db.addNationalTeam(chatId, text);
             userStates.delete(userId);
             const isAdminUser = await isAdmin(chatId, userId);
-            bot.sendMessage(chatId, 
-                success ? `✅ Сборная "${text}" добавлена!` : `⚠️ Сборная "${text}" уже есть!`, 
-                getMainKeyboard(isAdminUser, !!currentTournament)
-            );
+            bot.sendMessage(chatId, success ? `✅ Сборная "${text}" добавлена!` : `⚠️ Сборная "${text}" уже есть!`, getMainKeyboard(isAdminUser, !!currentTournament));
             return;
         }
         
-        // Ввод счёта
-        if (state && (state.action === 'waiting_for_score' || state.action === 'editing_score')) {
-            const match = /^(\d+)[:\s\-](\d+)$/.exec(text);
-            if (!match) {
-                const err = await bot.sendMessage(chatId, '❌ Формат: 2:1, 2 1, 2-1');
-                saveMessageId(chatId, err.message_id);
+        // ✅ FALLBACK: если написали счёт без выбора матча, но есть турнир
+        const scoreRegex = /^(\d+)[:\s\-](\d+)$/;
+        if (scoreRegex.test(text.trim()) && currentTournament && currentTournament.active) {
+            const incomplete = currentTournament.matches.filter(m => !m.completed);
+            if (incomplete.length === 1) {
+                // Один незавершённый матч — применяем к нему
+                userStates.set(userId, { action: 'waiting_for_score', matchId: incomplete[0].id });
+                await handleScoreInput(chatId, userId, text);
                 return;
-            }
-            const score1 = parseInt(match[1]);
-            const score2 = parseInt(match[2]);
-            const tm = currentTournament.matches.find(m => m.id === state.matchId);
-            if (!tm) { userStates.delete(userId); return; }
-            
-            if (score1 === score2) {
-                userStates.set(userId, { action: 'waiting_for_penalty', matchId: state.matchId, score1, score2 });
+            } else if (incomplete.length > 1) {
+                // Несколько — спрашиваем, к какому
+                const scoreMatch = scoreRegex.exec(text.trim());
+                const score1 = parseInt(scoreMatch[1]);
+                const score2 = parseInt(scoreMatch[2]);
+                
                 const keyboard = {
                     reply_markup: {
-                        inline_keyboard: [
-                            [{ text: tm.player1, callback_data: `penalty_${tm.player1}` }],
-                            [{ text: tm.player2, callback_data: `penalty_${tm.player2}` }]
-                        ]
+                        inline_keyboard: incomplete.map(m => [{
+                            text: `${m.player1} vs ${m.player2}`,
+                            callback_data: `record_match_${m.id}`
+                        }])
                     }
                 };
-                const pMsg = await bot.sendMessage(chatId, `⚽️ Ничья ${score1}:${score2}!\nКто победил по пенальти?`, keyboard);
-                saveMessageId(chatId, pMsg.message_id);
-            } else {
-                tm.score1 = score1;
-                tm.score2 = score2;
-                tm.penalties = null;
-                tm.completed = true;
-                
-                await db.recordMatch(chatId, tm, currentTournament.participants, currentTournament.type);
-                
-                const resMsg = await bot.sendMessage(chatId, `✅ ${tm.player1} ${score1}:${score2} ${tm.player2}`);
-                saveMessageId(chatId, resMsg.message_id);
-                
-                const stats = calculateStats(currentTournament.participants, currentTournament.matches);
-                const sMsg = await bot.sendMessage(chatId, getStandingsTable(stats), { parse_mode: 'HTML' });
-                const lMsg = await bot.sendMessage(chatId, getLiveStatus(currentTournament.matches), { parse_mode: 'HTML' });
-                saveMessageId(chatId, sMsg.message_id);
-                saveMessageId(chatId, lMsg.message_id);
-                
-                userStates.delete(userId);
-                if (currentTournament.matches.every(m => m.completed)) {
-                    const cMsg = await bot.sendMessage(chatId, '🏆 Все матчи сыграны! Нажми "Завершить".');
-                    saveMessageId(chatId, cMsg.message_id);
-                }
+                await bot.sendMessage(chatId, 
+                    `📝 К какому матчу применить счёт <b>${score1}:${score2}</b>?`,
+                    { parse_mode: 'HTML', ...keyboard }
+                );
+                return;
             }
-            return;
         }
         
         const isAdminUser = await isAdmin(chatId, userId);
@@ -2357,17 +2173,10 @@ bot.on('message', async (msg) => {
                 break;
                 
             case '✏️ Редактировать список команд':
-                if (!isAdminUser) { 
-                    bot.sendMessage(chatId, '⛔️ Только админ!'); 
-                    break; 
-                }
+                if (!isAdminUser) { bot.sendMessage(chatId, '⛔️ Только админ!'); break; }
                 const editMsg = await bot.sendMessage(chatId,
-                    `✏️ <b>Редактирование списка команд</b>\n\n` +
-                    `Выберите действие:`,
-                    {
-                        parse_mode: 'HTML',
-                        reply_markup: getEditTeamsKeyboard()
-                    }
+                    `✏️ <b>Редактирование списка команд</b>\n\nВыберите действие:`,
+                    { parse_mode: 'HTML', reply_markup: getEditTeamsKeyboard() }
                 );
                 saveMessageId(chatId, editMsg.message_id);
                 break;
