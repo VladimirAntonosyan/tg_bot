@@ -8,7 +8,7 @@ const db = require('./db');
 const { createPayment, getPayment } = require('./payment');
 
 // ============ КОНСТАНТЫ ============
-const BOT_USERNAME = 'fc26avangard_bot';
+const BOT_USERNAME = 'FcTourBot';
 
 // 🔧 FIX #2: IP-whitelist ЮKassa (можно переопределить в .env)
 const YOOKASSA_IPS = (process.env.YOOKASSA_IPS || '')
